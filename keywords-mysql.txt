@@ -1,0 +1,32 @@
+create
+drop
+select
+use
+insert into
+delete
+update
+alter
+rename
+from
+where
+values
+group by
+having
+column
+count
+table
+database
+view
+index
+!
+like
+<
+>
+>=
+<=
+order by
+distinct
+limit <n>
+primary key
+alternate key
+join

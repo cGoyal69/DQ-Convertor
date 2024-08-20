@@ -1,0 +1,29 @@
+create
+drop
+find, findOne
+use
+insertOne, insertMany
+deleteOne, deleteMany
+updateOne, updateMany
+updateMany
+
+
+{}
+
+
+
+
+.count()
+Collection
+
+View
+Index
+{$ne: }
+{$regex: }
+{$lt:}
+{$gt:}
+{$gte:}
+{$lte:}
+.sort({})
+.distinct()
+.limit(<n>)
