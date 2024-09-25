@@ -1,5 +1,3 @@
-//const fs = require('fs');
-
 // Function to parse a single condition and segregate field, operator, and value
 function parseCondition(field, condition) {
   const result = [];
@@ -81,28 +79,10 @@ function convertIntermediateToSQL(intermediate, options = {}) {
       
       // Evaluation Operators
       case '$regex': return 'LIKE'; // For pattern matching
-      case '$mod': return 'MOD'; // Modulo operation
-      case '$text': return 'MATCH'; // Full-text search (SQL full-text search needs custom implementation)
-      case '$where': return 'CUSTOM CONDITION'; // Custom conditions, no direct SQL equivalent
-      
-      // Array Operators
-      case '$all': return 'ALL'; // Can be simulated with multiple `IN` clauses
-      case '$elemMatch': return 'EXISTS (SELECT 1 ...)'; // Implement with subqueries or joins
-      case '$size': return 'COUNT'; // Checks array length
-      
-      // Update Operators
-      case '$inc': return '+='; // Increment operation
-      case '$set': return 'UPDATE SET'; // Updates field values
-      case '$unset': return 'UPDATE SET column = NULL'; // Removes fields
-      case '$push': return 'APPEND'; // No direct SQL equivalent (SQL databases do not support arrays)
-      case '$pop': return 'REMOVE FIRST/LAST'; // No direct SQL equivalent (SQL databases do not support arrays)
-      case '$pull': return 'REMOVE'; // No direct SQL equivalent (SQL databases do not support arrays)
-      case '$addToSet': return 'INSERT DISTINCT'; // No direct SQL equivalent (SQL databases do not support arrays)
       
       default: return operator; // Return the operator as-is if no match
     }
   }
-  
 
   function valueToSQL(value) {
     if (Array.isArray(value)) {
@@ -123,59 +103,251 @@ function convertIntermediateToSQL(intermediate, options = {}) {
 
   const sqlConditions = conditionsToSQL(intermediate.conditions);
   
-  let sqlQuery = `SELECT * FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
+  let sqlFindQuery = `SELECT * FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
 
-  // Handling projection (SELECT specific fields)
   if (options.projection && options.projection.length > 0) {
-    sqlQuery = `SELECT ${options.projection.join(', ')} FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
+    sqlFindQuery = `SELECT ${options.projection.join(', ')} FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
   }
 
-  // Handling sorting
   if (options.sort) {
     const sortConditions = Object.keys(options.sort).map(field => `${field} ${options.sort[field] > 0 ? 'ASC' : 'DESC'}`);
-    sqlQuery += ` ORDER BY ${sortConditions.join(', ')}`;
+    sqlFindQuery += ` ORDER BY ${sortConditions.join(', ')}`;
   }
 
-  // Handling limit
   if (options.limit) {
-    sqlQuery += ` LIMIT ${options.limit}`;
+    sqlFindQuery += ` LIMIT ${options.limit}`;
   }
 
-  // Handling offset (skip)
   if (options.skip) {
-    sqlQuery += ` OFFSET ${options.skip}`;
+    sqlFindQuery += ` OFFSET ${options.skip}`;
   }
 
-  return sqlQuery + ';';
+  return sqlFindQuery + ';';
 }
 
-//String to Object
-function stringToObject(str) {
-    try {
-        let obj = JSON.parse(str);
-        return obj;
-    } catch (error) {
-        console.error("Invalid JSON string:", error);
-        return null;
-    }
+// Convert MongoDB insert command to SQL insert statement
+function convertInsertToSQL(documents, options = {}) {
+  if (!Array.isArray(documents)) {
+    documents = [documents]; // Handle single document insertion
+  }
+
+  const columns = Object.keys(documents[0]);
+  const values = documents.map(doc =>
+    `(${columns.map(col => (typeof doc[col] === 'string' ? `'${doc[col]}'` : doc[col])).join(', ')})`
+  );
+
+  const sqlInsert = `INSERT INTO ${options.table || 'table_name'} (${columns.join(', ')}) VALUES ${values.join(', ')};`;
+
+  return sqlInsert;
 }
-let scomd = '{"$and":[{"age" : {"$lt" : 21, "$gt": 18}}, {"name": "Kavyaa"}]}'
-// Example MongoDB Query
-const mongoQuery = stringToObject(scomd)
+
+function createSQLTable(documents, options = {}) {
+  const tableName = options.table || 'table_name';
+  
+  // Dynamically determine column data types based on the MongoDB document schema
+  const columns = Object.keys(documents[0]).map(key => {
+    const value = documents[0][key];
+    let dataType;
+
+    if (typeof value === 'string') {
+      dataType = 'VARCHAR(255)';
+    } else if (typeof value === 'number') {
+      dataType = Number.isInteger(value) ? 'INT' : 'FLOAT';
+    } else if (Array.isArray(value)) {
+      dataType = 'TEXT'; // For storing arrays as a string (e.g., JSON)
+    } else if (typeof value === 'boolean') {
+      dataType = 'BOOLEAN';
+    } else {
+      dataType = 'TEXT'; // Default to TEXT for complex or undefined types
+    }
+
+    return `${key} ${dataType}`;
+  });
+
+  const sqlCreateTable = `CREATE TABLE ${tableName} (\n  id INT PRIMARY KEY AUTO_INCREMENT,\n  ${columns.join(',\n  ')}\n);`;
+
+  return sqlCreateTable;
+}
+//String to Object
+// Replace keys without quotes and then single quotes with double quotes
+function stringToObject(str) {
+  // Replace keys without quotes and then single quotes with double quotes
+  const validJsonString = str
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Wrap keys in double quotes
+      .replace(/'/g, '"'); // Replace single quotes with double quotes
+
+  try {
+      const jsonObject = JSON.parse(validJsonString);
+      return jsonObject;
+  } catch (error) {
+      console.error("Error parsing JSON:", error);
+      return null;
+  }
+}
+function convertUpdateToSQL(update, conditions, options = {}) {
+  const updates = [];
+  
+  Object.keys(update).forEach(operator => {
+    switch (operator) {
+      // Handle $set operator
+      case '$set':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = ${typeof update[operator][field] === 'string' ? `'${update[operator][field]}'` : update[operator][field]}`);
+        });
+        break;
+
+      // Handle $unset operator
+      case '$unset':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = NULL`);
+        });
+        break;
+
+      // Handle $inc operator
+      case '$inc':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = ${field} + ${update[operator][field]}`);
+        });
+        break;
+
+      // Handle $mul operator
+      case '$mul':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = ${field} * ${update[operator][field]}`);
+        });
+        break;
+
+      // Handle $rename operator
+      case '$rename':
+        Object.keys(update[operator]).forEach(oldField => {
+          const newField = update[operator][oldField];
+          // Simulate renaming by creating a new column and dropping the old one
+          updates.push(`${newField} = ${oldField}`);
+          updates.push(`${oldField} = NULL`);
+        });
+        break;
+
+      // Handle $min operator
+      case '$min':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = LEAST(${field}, ${update[operator][field]})`);
+        });
+        break;
+
+      // Handle $max operator
+      case '$max':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = GREATEST(${field}, ${update[operator][field]})`);
+        });
+        break;
+
+      // Handle $currentDate operator
+      case '$currentDate':
+        Object.keys(update[operator]).forEach(field => {
+          if (update[operator][field] === true || update[operator][field].$type === 'date') {
+            updates.push(`${field} = NOW()`);
+          } else if (update[operator][field].$type === 'timestamp') {
+            updates.push(`${field} = CURRENT_TIMESTAMP`);
+          }
+        });
+        break;
+
+      // Handle $push operator (assumes array fields in SQL as JSON or TEXT)
+      case '$push':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = JSON_ARRAY_APPEND(${field}, '$', ${JSON.stringify(update[operator][field])})`);
+        });
+        break;
+
+      // Handle $pop operator (removes first or last element from array, not easily translatable to SQL without advanced JSON functions)
+      case '$pop':
+        Object.keys(update[operator]).forEach(field => {
+          if (update[operator][field] === 1) {
+            // Pop last element
+            updates.push(`${field} = JSON_REMOVE(${field}, JSON_LENGTH(${field}) - 1)`);
+          } else if (update[operator][field] === -1) {
+            // Pop first element
+            updates.push(`${field} = JSON_REMOVE(${field}, 0)`);
+          }
+        });
+        break;
+
+      // Handle $pull operator (remove all instances of a value from array)
+      case '$pull':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = JSON_REMOVE(${field}, '${update[operator][field]}')`);
+        });
+        break;
+
+      // Handle $addToSet operator (only adds to the array if the value does not already exist, assumes array is stored as JSON or TEXT)
+      case '$addToSet':
+        Object.keys(update[operator]).forEach(field => {
+          updates.push(`${field} = JSON_ARRAY_APPEND(${field}, '$', ${JSON.stringify(update[operator][field])})`);
+        });
+        break;
+
+      // Handle $bit operator (bitwise update)
+      case '$bit':
+        Object.keys(update[operator]).forEach(field => {
+          const bitUpdate = update[operator][field];
+          Object.keys(bitUpdate).forEach(bitOp => {
+            if (bitOp === 'and') {
+              updates.push(`${field} = ${field} & ${bitUpdate[bitOp]}`);
+            } else if (bitOp === 'or') {
+              updates.push(`${field} = ${field} | ${bitUpdate[bitOp]}`);
+            } else if (bitOp === 'xor') {
+              updates.push(`${field} = ${field} ^ ${bitUpdate[bitOp]}`);
+            }
+          });
+        });
+        break;
+
+      default:
+        console.error(`Unknown operator: ${operator}`);
+    }
+  });
+
+  const sqlUpdate = `UPDATE ${options.table || 'table_name'} SET ${updates.join(', ')} WHERE ${conditions.join(' AND ')};`;
+  return sqlUpdate;
+}
+
+// Example usage of convertUpdateToSQL:
+
+const updateQuery = {
+  $set: { age: 35, city: "New York" },
+  $inc: { score: 5 },
+  $min: { age: 30 },
+  $max: { score: 100 },
+  $rename: { oldField: "newField" }
+};
+
+
+// Sample MongoDB insertMany example
+const scomd = '[{name:"Alice",age:24,city:"Los Angeles",hobbies:["hiking","music"]},{name:"Bob",age:32,city:"Chicago",hobbies:["sports","photography"]},{name:"Charlie",age:28,city:"Houston",hobbies:["gaming","cooking"]}]';
+const mongoQuery = stringToObject(scomd);
 console.log(mongoQuery)
-// Example projection, sorting, and limiting options (equivalent to MongoDB's find(), sort(), and limit())for mysql purpose only
+
+// Query options for MySQL
 const queryOptions = {
+  operation: 'find',
   table: 'employees',
-  projection: ['name', 'age', 'gender'],
+  projection: ['name', 'age'],
   sort: { age: 1, name: -1 },  // age ASC, name DESC
   limit: 10,
   skip: 5
 };
 
-// Convert MongoDB query to intermediate representation with segregation
+// Convert MongoDB query to intermediate representation
 const intermediateRepresentation = convertQueryToIntermediate(mongoQuery);
 console.log("Intermediate Representation:", JSON.stringify(intermediateRepresentation, null, 2));
 
-// Convert intermediate representation to SQL query with additional options
-const sqlQuery = convertIntermediateToSQL(intermediateRepresentation, queryOptions);
-console.log("Generated SQL Query:", sqlQuery);
+// Convert intermediate representation to SQL query
+const sqlFindQuery = convertIntermediateToSQL(intermediateRepresentation, queryOptions);
+console.log("Generated SQL Query:", sqlFindQuery);
+
+// Convert MongoDB insert command to SQL insert statement
+const sqlInsertQuery = convertInsertToSQL(mongoQuery,queryOptions );
+console.log("Generated SQL Insert Query:", sqlInsertQuery);
+
+const createTableSQL = createSQLTable(mongoQuery, queryOptions);
+console.log("Generated SQL Create Table Query:\n", createTableSQL);

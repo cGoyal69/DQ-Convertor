@@ -1,40 +1,23 @@
-function convertMongoQueryToJSON(query) {
-    // Break down the query into filter and projection
-    let filter = {};
-    let projection = {};
-  
-    Object.keys(query).forEach(key => {
-      if (key === 'projection') {
-        projection = query[key];
-      } else {
-        filter[key] = query[key];
-      }
-    });
-  
-    // Convert filter to JSON format
-    const filterJson = JSON.stringify({ filter }, null, 2);
-  
-    // Convert projection to JSON format
-    const projectionJson = JSON.stringify({ projection }, null, 2);
-  
-    // Combine filter and projection into a single JSON object
-    const combinedJson = JSON.stringify({ filter, projection }, null, 2);
-  
-    return {
-      filterJson,
-      projectionJson
-    };
-  }
-  
-  // Example usage:
-  const query = {
-    $and: [{ age: 30 }, { name: "John" }]
+function extractFilterAndProjectionFromFind(findQuery) {
+  // Assuming the findQuery is a two-parameter array: [filter, projection]
+  const [filter, projection] = findQuery;
+
+  // Returning the filter and projection objects
+  return {
+    filter: filter || {},       // If no filter is provided, return an empty object
+    projection: projection || {}  // If no projection is provided, return an empty object
   };
-  
-  const result = convertMongoQueryToJSON(query);
-  
-  console.log("Filter in JSON format:");
-  console.log(result.filterJson);
-  
-  console.log("Projection in JSON format:");
-  console.log(result.projectionJson);
+}
+
+// Example usage:
+const findQuery = [
+  { $and: [{ age: 30 }, { name: "John" }] },{ name: 1, age: 1, _id: 0 }              // Projection: include 'name' and 'age', exclude '_id'
+];
+const result = extractFilterAndProjectionFromFind(findQuery);
+
+// Correct logging
+console.log("Filter in object format:");
+console.log(result.filter);
+
+console.log("Projection in object format:");
+console.log(result.projection);
