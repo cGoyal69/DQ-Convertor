@@ -2,13 +2,22 @@
 function parseCondition(field, condition) {
   const result = [];
   if (typeof condition === 'object' && !Array.isArray(condition)) {
-    // Handle conditions like { "$gte": 18 }
     Object.keys(condition).forEach(operator => {
-      result.push({
-        field: field,
-        operator: operator,
-        value: condition[operator]
-      });
+      if (operator === '$expr') {
+        // Handle $expr separately if needed
+        result.push({
+          field: field,
+          operator: operator,
+          value: condition[operator] // May need special handling for SQL
+        });
+      } else {
+        // Handle conditions like { "$gte": 18 } or { age: 18 }
+        result.push({
+          field: field,
+          operator: operator,
+          value: condition[operator]
+        });
+      }
     });
   } else {
     // Handle conditions like { age: 18 }
@@ -56,7 +65,7 @@ function convertQueryToIntermediate(query) {
 }
 
 // Function to convert intermediate representation to SQL query
-function convertIntermediateToSQL(intermediate, options = {}) {
+function convertIntermediateToSQL(intermediate) {
   function operatorToSQL(operator) {
     switch (operator) {
       // Comparison Operators
@@ -67,26 +76,27 @@ function convertIntermediateToSQL(intermediate, options = {}) {
       case '$lt': return '<';
       case '$lte': return '<=';
       case '$in': return 'IN';
-      
+      case '$nin': return 'NOT IN';
+
       // Logical Operators
       case '$and': return 'AND';
       case '$or': return 'OR';
       case '$not': return 'NOT';
-      case '$nor': return 'NOT (A OR B)'; // $nor translates to NOT (A OR B) in SQL
-      
+      case '$nor': return 'NOT'; // $nor translates to NOT (A OR B) in SQL
+
       // Element Operators
       case '$exists': return 'IS NOT NULL'; // Checks if a field exists
-      
+
       // Evaluation Operators
       case '$regex': return 'LIKE'; // For pattern matching
-      
+
       default: return operator; // Return the operator as-is if no match
     }
   }
 
   function valueToSQL(value) {
     if (Array.isArray(value)) {
-      return `(${value.map(v => typeof v === 'string' ? `'${v}'` : v).join(', ')})`;
+      return `(${value.map(v => (typeof v === 'string' ? `'${v}'` : v)).join(', ')})`;
     }
     return typeof value === 'string' ? `'${value}'` : value;
   }
@@ -95,18 +105,24 @@ function convertIntermediateToSQL(intermediate, options = {}) {
     return conditions.map(condition => {
       if (condition.operator === '$and' || condition.operator === '$or') {
         return `(${conditionsToSQL(condition.conditions).join(` ${operatorToSQL(condition.operator)} `)})`;
+      } else if (condition.operator === '$expr') {
+        // Handle $expr here (needs to be defined based on your requirements)
+        return `${condition.value}`; // This would depend on the structure of the expression
       } else {
         return `${condition.field} ${operatorToSQL(condition.operator)} ${valueToSQL(condition.value)}`;
       }
     });
   }
 
-  const sqlConditions = conditionsToSQL(intermediate.conditions);
-  
-  let sqlFindQuery = `SELECT * FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
+  return conditionsToSQL(intermediate.conditions).join(' AND ');
+}
+
+function convertFindToSQL(intermediate, options = {}) {
+  const sqlConditions = convertIntermediateToSQL(intermediate);
+  let sqlFindQuery = `SELECT * FROM ${options.table || 'table_name'} WHERE ${sqlConditions}`;
 
   if (options.projection && options.projection.length > 0) {
-    sqlFindQuery = `SELECT ${options.projection.join(', ')} FROM ${options.table || 'table_name'} WHERE ${sqlConditions.join(' AND ')}`;
+    sqlFindQuery = `SELECT ${options.projection.join(', ')} FROM ${options.table || 'table_name'} WHERE ${sqlConditions}`;
   }
 
   if (options.sort) {
@@ -123,6 +139,11 @@ function convertIntermediateToSQL(intermediate, options = {}) {
   }
 
   return sqlFindQuery + ';';
+}
+
+function convertDeleteToSQL(intermediate, options = {}) {
+  const sqlConditions = convertIntermediateToSQL(intermediate);
+  return `DELETE FROM ${options.table || 'table_name'} WHERE ${sqlConditions};`;
 }
 
 // Convert MongoDB insert command to SQL insert statement
@@ -173,8 +194,8 @@ function createSQLTable(documents, options = {}) {
 function stringToObject(str) {
   // Replace keys without quotes and then single quotes with double quotes
   const validJsonString = str
-      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Wrap keys in double quotes
-      .replace(/'/g, '"'); // Replace single quotes with double quotes
+    .replace(/([{,]\s*)([\$]*\w+)(\s*:)/g, '$1"$2"$3')// Wrap keys in double quotes
+    .replace(/'/g, '"'); // Replace single quotes with double quotes
 
   try {
       const jsonObject = JSON.parse(validJsonString);
@@ -306,9 +327,8 @@ function convertUpdateToSQL(update, conditions, options = {}) {
         console.error(`Unknown operator: ${operator}`);
     }
   });
-
-  const sqlUpdate = `UPDATE ${options.table || 'table_name'} SET ${updates.join(', ')} WHERE ${conditions.join(' AND ')};`;
-  return sqlUpdate;
+  const sqlUpdateQuery = `UPDATE ${options.table || 'table_name'} SET ${updates.join(', ')} WHERE ${convertIntermediateToSQL(convertQueryToIntermediate(conditions), options)};`;
+  return sqlUpdateQuery;
 }
 
 // Example usage of convertUpdateToSQL:
@@ -331,10 +351,8 @@ console.log(mongoQuery)
 const queryOptions = {
   operation: 'find',
   table: 'employees',
-  projection: ['name', 'age'],
-  sort: { age: 1, name: -1 },  // age ASC, name DESC
-  limit: 10,
-  skip: 5
+  projection: {},
+  sort: null ,   // age ASC, name DESC
 };
 
 // Convert MongoDB query to intermediate representation
@@ -342,7 +360,7 @@ const intermediateRepresentation = convertQueryToIntermediate(mongoQuery);
 console.log("Intermediate Representation:", JSON.stringify(intermediateRepresentation, null, 2));
 
 // Convert intermediate representation to SQL query
-const sqlFindQuery = convertIntermediateToSQL(intermediateRepresentation, queryOptions);
+const sqlFindQuery = convertFindToSQL(intermediateRepresentation, queryOptions);
 console.log("Generated SQL Query:", sqlFindQuery);
 
 // Convert MongoDB insert command to SQL insert statement
@@ -351,3 +369,6 @@ console.log("Generated SQL Insert Query:", sqlInsertQuery);
 
 const createTableSQL = createSQLTable(mongoQuery, queryOptions);
 console.log("Generated SQL Create Table Query:\n", createTableSQL);
+
+const sqlupdateQuery = convertUpdateToSQL(updateQuery,mongoQuery, queryOptions);
+console.log("Generated Update Table Query:\n", sqlupdateQuery);
