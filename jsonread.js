@@ -10,9 +10,7 @@ function extractFilterAndProjectionFromFind(findQuery) {
 }
 
 // Example usage:
-const findQuery = [
-  { $and: [{ age: 30 }, { name: "John" }] },{ name: 1, age: 1, _id: 0 }              // Projection: include 'name' and 'age', exclude '_id'
-];
+const findQuery = [ {}, { name: 1, age: 1, _id: 0 } ]
 const result = extractFilterAndProjectionFromFind(findQuery);
 
 // Correct logging
