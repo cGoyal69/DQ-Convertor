@@ -65,14 +65,22 @@ function sqlToIntermediateJSON(sql) {
     return intermediate;
   }
 
-  // Default to SELECT (Find)
-  intermediate.operation = 'find';
-
-  // Parse SELECT clause
+  // Default to SELECT (Find or Aggregate)
   const selectMatch = sql.match(selectRegex);
   if (selectMatch) {
+    // Normalize SQL to lower case for case-insensitive matching
+    const normalizedSql = sql.toLowerCase();
+  
+    // Check for aggregate functions and common aggregation patterns
+    const aggregateFunctions = /count|sum|avg|min|max|stddev|variance|json_agg|array_agg|group_concat/i;
+    const isAggregate = normalizedSql.includes('group by') || 
+                        normalizedSql.includes('having') || 
+                        aggregateFunctions.test(selectMatch[1]);
+  
+    intermediate.operation = isAggregate ? 'aggregate' : 'find';
     intermediate.projection = selectMatch[1].split(',').map(field => field.trim());
   }
+
 
   // Parse FROM clause
   const fromMatch = sql.match(fromRegex);
@@ -128,6 +136,7 @@ function sqlToIntermediateJSON(sql) {
 
   return intermediate;
 }
+
 
 // Helper functions
 function parseOrderByClause(orderByClause) {
@@ -239,52 +248,97 @@ function parseJoinClause(joinClause) {
 }
 
 // Function to convert Intermediate JSON to MongoDB query
-function intermediateToMongo(intermediate) {
-  let mongoQuery = {};
 
   // Handle find operation (SELECT)
-  if (intermediate.operation === 'find') {
-    mongoQuery = `db.${intermediate.collection}.find(`;
-
-    // Match filtering conditions (WHERE clause)
-    if (intermediate.filter) {
-      const filter = generateFilter(intermediate.filter);
-      mongoQuery += filter ? `${JSON.stringify(filter)}, ` : '';
+  function intermediateToMongo(intermediate) {
+    let mongoQuery = {};
+  
+    // Handle find operation (SELECT)
+    if (intermediate.operation === 'find') {
+      mongoQuery = `db.${intermediate.collection}.find(`;
+  
+      // Match filtering conditions (WHERE clause)
+      if (intermediate.filter) {
+        const filter = generateFilter(intermediate.filter);
+        mongoQuery += filter ? `${JSON.stringify(filter)}, ` : '';
+      }
+  
+      // Match projection (SELECT fields)
+      if (intermediate.projection) {
+        const projection = {};
+        intermediate.projection.forEach(field => {
+          const fieldName = field.split(' AS ')[0].trim();
+          projection[fieldName] = 1; // Set to 1 for projection
+        });
+        mongoQuery += `${JSON.stringify(projection)}`;
+      } else {
+        mongoQuery += '{}'; // return all fields if no projection
+      }
+  
+      mongoQuery += ')';
+  
+      // Add sorting conditions (ORDER BY clause)
+      if (intermediate.orderBy) {
+        const sortFields = intermediate.orderBy.map(order => {
+          return `${order.field}: ${order.order === 'desc' ? -1 : 1}`;
+        });
+        mongoQuery += `.sort({ ${sortFields.join(', ')} })`;
+      }
+  
+      // Add limit (LIMIT clause)
+      if (intermediate.limit) {
+        mongoQuery += `.limit(${intermediate.limit})`;
+      }
+  
+      // Add offset (OFFSET clause)
+      if (intermediate.offset) {
+        mongoQuery += `.skip(${intermediate.offset})`;
+      }
     }
-
-    // Match projection (SELECT fields)
-    if (intermediate.projection) {
-      // Only include the field names in the projection
-      const projection = {};
-      intermediate.projection.forEach(field => {
-        const fieldName = field.split(' AS ')[0].trim(); // Extract field name before AS
-        projection[fieldName] = 1; // Set to 1 for projection
-      });
-      mongoQuery += `${JSON.stringify(projection)}`;
-    } else {
-      mongoQuery += '{}'; // return all fields if no projection
+  
+    // Handle aggregate operation
+    if (intermediate.operation === 'aggregate') {
+      mongoQuery = `db.${intermediate.collection}.aggregate([`;
+  
+      // Match filtering conditions (WHERE clause)
+      if (intermediate.filter) {
+        const filter = generateFilter(intermediate.filter);
+        mongoQuery += `{ $match: ${JSON.stringify(filter)} }, `;
+      }
+  
+      // Add group by (GROUP BY clause)
+      if (intermediate.groupBy) {
+        const groupStage = {
+          $group: intermediate.groupBy.reduce((acc, field) => {
+            acc[field] = { $first: `$${field}` }; // Modify this based on your aggregation logic
+            return acc;
+          }, { _id: null })
+        };
+        mongoQuery += JSON.stringify(groupStage) + ', ';
+      }
+  
+      // Add having (HAVING clause)
+      if (intermediate.having) {
+        const havingConditions = generateFilter(intermediate.having.$and);
+        mongoQuery += `{ $match: ${JSON.stringify(havingConditions)} }, `;
+      }
+  
+      // Add project stage (SELECT fields)
+      if (intermediate.projection) {
+        const projectStage = {
+          $project: intermediate.projection.reduce((acc, field) => {
+            acc[field.split(' AS ')[0].trim()] = 1; // Set to 1 for projection
+            return acc;
+          }, {})
+        };
+        mongoQuery += JSON.stringify(projectStage);
+      } else {
+        mongoQuery += '{}'; // return all fields if no projection
+      }
+  
+      mongoQuery += '])';
     }
-
-    mongoQuery += ')';
-
-    // Add sorting conditions (ORDER BY clause)
-    if (intermediate.orderBy) {
-      const sortFields = intermediate.orderBy.map(order => {
-        return `${order.field}: ${order.order === 'desc' ? -1 : 1}`;
-      });
-      mongoQuery += `.sort({ ${sortFields.join(', ')} })`;
-    }
-
-    // Add limit (LIMIT clause)
-    if (intermediate.limit) {
-      mongoQuery += `.limit(${intermediate.limit})`;
-    }
-
-    // Add offset (OFFSET clause)
-    if (intermediate.offset) {
-      mongoQuery += `.skip(${intermediate.offset})`;
-    }
-  }
+  
 
   // Handle insert operation
   if (intermediate.operation === 'insertOne') {
@@ -299,21 +353,26 @@ function intermediateToMongo(intermediate) {
   if (intermediate.operation === 'updateMany') {
     mongoQuery = `db.${intermediate.collection}.updateMany(`;
 
+    // Match filtering conditions
     if (intermediate.filter) {
       const filter = generateFilter(intermediate.filter);
-      mongoQuery += filter ? `${JSON.stringify(filter)}, ` : '';
+      mongoQuery += `${JSON.stringify(filter)}, `;
     }
 
-    mongoQuery += JSON.stringify(intermediate.update) + ')';
+    // Match update conditions
+    if (intermediate.update) {
+      mongoQuery += `${JSON.stringify(intermediate.update)}`;
+    }
+    mongoQuery += ')';
   }
 
   // Handle delete operation
-  if (intermediate.operation === 'deleteOne') {
-    mongoQuery = `db.${intermediate.collection}.deleteOne(${generateFilter(intermediate.filter)})`;
+  if (intermediate.operation === 'deleteMany') {
+    mongoQuery = `db.${intermediate.collection}.deleteMany(${JSON.stringify(intermediate.filter)})`;
   }
 
-  if (intermediate.operation === 'deleteMany') {
-    mongoQuery = `db.${intermediate.collection}.deleteMany(${generateFilter(intermediate.filter)})`;
+  if (intermediate.operation === 'deleteOne') {
+    mongoQuery = `db.${intermediate.collection}.deleteOne(${JSON.stringify(intermediate.filter)})`;
   }
 
   return mongoQuery;
@@ -370,49 +429,20 @@ function generateFilter(conditions) {
 
   return orConditions.length > 0 ? { $or: orConditions } : {};
 }
-let sqlQuery = `SELECT 
-        users.id AS userId,
-        users.name AS userName,
-        SUM(orders.totalAmount) AS totalSpent,
-        COUNT(orders.id) AS totalOrders,
-        AVG(orders.totalAmount) AS avgOrderAmount,
-        MAX(orders.totalAmount) AS maxOrderAmount,
-        MIN(orders.totalAmount) AS minOrderAmount,
-        COUNT(reviews.id) AS totalReviews,
-        latestOrder.orderDate AS lastOrderDate,
-        region.regionName AS userRegion,
-        CASE WHEN SUM(orders.totalAmount) > 5000 THEN 'VIP' ELSE 'Regular' END AS userCategory
-    FROM 
-        users
-    INNER JOIN orders ON users.id = orders.userId
-    LEFT JOIN reviews ON users.id = reviews.userId
-    LEFT JOIN (SELECT userId, MAX(orderDate) AS orderDate FROM orders GROUP BY userId) AS latestOrder 
-        ON users.id = latestOrder.userId
-    INNER JOIN address ON users.addressId = address.id
-    INNER JOIN region ON address.regionId = region.id
-    RIGHT JOIN discounts ON discounts.userId = users.id
-    CROSS JOIN promotions
-    WHERE 
-        orders.totalAmount > 100
-        AND promotions.isActive = 1
-    GROUP BY 
-        users.id, users.name, region.regionName, latestOrder.orderDate
-    HAVING 
-        totalOrders > 5
-    ORDER BY 
-        totalSpent DESC, avgOrderAmount ASC
-    LIMIT 10;`;
+
+let sqlQuery = `SELECT department, AVG(salary) AS average_salary FROM employees GROUP BY department;`;
 function toSingleLine(str) {
     return str.replace(/\s+/g, ' ').trim();
 }
 function removeEscapeCharacters(query) {
   return query.replace(/\\n/g, ' ').replace(/\\/g, '');
 }
+
 sqlQuery = toSingleLine(sqlQuery)
 const intermediateJson = sqlToIntermediateJSON(sqlQuery);
 console.log(intermediateJson);
 
-const mongoQuery = intermediateToMongo(intermediateJson);
-a = (JSON.stringify(mongoQuery, null, 2));
+let mongoquery = intermediateToMongo(intermediateJson);
+a = (JSON.stringify(mongoquery, null, 2));
 b = toSingleLine(a)
 console.log(removeEscapeCharacters(b))
