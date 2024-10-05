@@ -1,8 +1,7 @@
 function mongoTokens(query) {
     let bracket = ['1'], h = [], p = "", isString = false, prev = ' ';
-    for(let i = 0; i < query.length; i++) {
-        if(query[i] == '\'' || query[i] == '"') 
-        {
+    for (let i = 0; i < query.length; i++) {
+        if (query[i] == '\'' || query[i] == '"') {
             if (query[i] == prev) {
                 prev = ' ';
                 isString = false;
@@ -12,129 +11,126 @@ function mongoTokens(query) {
                 prev = query[i];
                 p += query[i];
             }
-        } 
-        else if (isString)
-            p+=query[i];
-        else if (!isString){
-            if (bracket[bracket.length-1] != '(' || query[i] == '.') {
+        } else if (isString) {
+            p += query[i];
+        } else {
+            if (bracket[bracket.length - 1] != '(' || query[i] == '.') {
                 if (query[i] == '(' || query[i] == '.') {
-                    if (query[i] == '(')
-                        bracket.push('(');
-                    if (p.length != 0)
-                        h.push(p);
+                    if (query[i] == '(') bracket.push('(');
+                    if (p.length != 0) h.push(p);
                     p = "";
-                } 
-                else 
+                } else {
                     p += query[i];
-            } else if(!isString) {
-                if (query[i] == '(')
-                    bracket.push('(');
-                if(query[i] == ')') {
+                }
+            } else {
+                if (query[i] == '(') bracket.push('(');
+                if (query[i] == ')') {
                     bracket.pop();
-                    if (bracket[bracket.length-1] == '(')
-                        p += ")";
-                    if(p.length != 0 && bracket[bracket.length-1] == '1') {
+                    if (bracket[bracket.length - 1] == '(') p += ")";
+                    if (p.length != 0 && bracket[bracket.length - 1] == '1') {
                         h.push(p);
                         p = "";
                     }
-                } else 
+                } else {
                     p += query[i];
-            } else 
-                p += query[i];
+                }
+            }
         }
     }
     return h;
 }
 
-const tokens = mongoTokens('db.employees.find({ $and: [{ age: { $gte: 25 } }, { salary: { $gt: 50000 } }, { department: { $in: ["Engineering", "Marketing"] } }, { status: "active" }, { hobbies: { $elemMatch: { $in: ["hiking", "gaming"] } } }] }, { name: 1, age: 1, department: 1, salary: 1, _id: 0 })');
-
-function toStringi(token)
-{
-    token = "["+token+"]"
-    return token
+function toStringi(token) {
+    return "[" + token + "]";
 }
+
 function stringToObject(str) {
-    // Replace keys without quotes and then single quotes with double quotes
     const validJsonString = str
-        .replace(/([{,]\s*)([\$]*\w+)(\s*:)/g, '$1"$2"$3')// Wrap keys in double quotes
+        .replace(/([{,]\s*)([\$]*\w+)(\s*:)/g, '$1"$2"$3') // Wrap keys in double quotes
         .replace(/'/g, '"'); // Replace single quotes with double quotes
-      
+
     try {
-        const jsonObject = JSON.parse(validJsonString);
-        return jsonObject;
+        return JSON.parse(validJsonString);
     } catch (error) {
         console.error("Error parsing JSON:", error);
         return null;
     }
 }
 
-
 function extractFilterAndProjectionFromFind(findQuery) {
-    // Assuming the findQuery is a two-parameter array: [filter, projection]
     const [filter, projection] = findQuery;
-  
-    // Returning the filter and projection objects
     return {
-      filter: filter || {},       // If no filter is provided, return an empty object
-      projection: projection || {}  // If no projection is provided, return an empty object
+        filter: filter || {},
+        projection: projection || {}
     };
-  }
-  function extractFilterAndProjectionFromInsertDelete(findQuery) {
-    // Assuming the findQuery is a two-parameter array: [filter, projection]
-    const [filter, projection] = findQuery;
-  
-    // Returning the filter and projection objects
+}
+
+function extractFilterAndProjectionFromInsert(findQuery) {
     return {
-      filter: filter || {},       // If no filter is provided, return an empty object 
+        documents: findQuery || []
     };
-  }
+}
 
 function extractFilterAndProjectionUpdate(findQuery) {
-    // Assuming the findQuery is a two-parameter array: [filter, projection]
-    const [filter] = findQuery;
-    // Returning the filter and projection objects
+    const [filter, update, options] = findQuery;
     return {
-        filter: filter[0] || {},
-        set : filter[1] || {},
-        upsert : filter[2] || {} 
+        filter: filter || {},
+        update: update || {},
+        options: options || {}
     };
 }
-if (tokens[2] == "find"){
-    console.log(tokens[3])
-    const token =  toStringi(tokens[3])
-    console.log(token)
-    const validString = stringToObject(token)
-    console.log(validString)
-    const result = extractFilterAndProjectionFromFind(validString)
 
+function extractPipelineFromAggregate(aggregateQuery) {
+    return {
+        pipeline: aggregateQuery || []
+    };
 }
-else if (tokens[2] == "insertOne" || tokens[2] == "insertMany"){
-    const token =  toStringi(tokens[3])
-    const validString = stringToObject(token)
-    const result = extractFilterAndProjectionFromInsertDelete(validString)
-    console.log(result)
 
-}
-else if (tokens[2] == "updateOne" || tokens[2] == "updateMany"){
-    
-}
-else if (tokens[2] == "deleteOne" || tokens[2] == "deleteMany"){
-    console.log("1")
-    console.log(tokens[3])
-    const token =  toStringi(tokens[3])
-    console.log(token)
-    const validString = stringToObject(token)
-    console.log(validString)
-    const result = extractFilterAndProjectionFromFind(validString)
-    console.log(result)
-}
-console.log(tokens)
+// Main function to parse the MongoDB query
+function parseMongoQuery(query) {
+    const tokens = mongoTokens(query);
+    const operation = tokens[2];
 
+    if (operation === "find") {
+        const token = toStringi(tokens[3]);
+        const validString = stringToObject(token);
+        const result = extractFilterAndProjectionFromFind(validString);
+        console.log("Find Result:", result);
+    } else if (operation === "insertOne" || operation === "insertMany") {
+        const token = toStringi(tokens[3]);
+        const validString = stringToObject(token);
+        const result = extractFilterAndProjectionFromInsert(validString);
+        console.log("Insert Result:", result);
+    } else if (operation === "updateOne" || operation === "updateMany") {
+        const token = toStringi(tokens[3]);
+        const validString = stringToObject(token);
+        const result = extractFilterAndProjectionUpdate(validString);
+        console.log("Update Result:", result);
+    } else if (operation === "deleteOne" || operation === "deleteMany") {
+        const token = toStringi(tokens[3]);
+        const validString = stringToObject(token);
+        const result = extractFilterAndProjectionFromFind(validString);
+        console.log("Delete Result:", result);
+    } else if (operation === "aggregate") {
+        const token = toStringi(tokens[3]);
+        const validString = stringToObject(token);
+        const result = extractPipelineFromAggregate(validString);
+        console.log("Aggregate Result:", result);
+    } else {
+        console.log("Unsupported operation");
+    }
+}
 
-//let string = stringToObject(validJsonString);
-//console.log(string);
-//let findQuery = [string];
-//const result = extractFilterAndProjection(findQuery);
-//const conditions = result.filter;
-//const projection = result.projection;
-//console.log(result);
+// Sample MongoDB queries
+const mongoFindQuery = `db.employees.find({ age: { $gte: 25 } }, { name: 1, age: 1 })`;
+const mongoInsertQuery = `db.employees.insertMany([{ name: "Alice", age: 24 }, { name: "Bob", age: 30 }])`;
+const mongoUpdateQuery = `db.employees.updateOne({ name: "Alice" }, { $set: { age: 25 } })`;
+const mongoDeleteQuery = `db.employees.deleteMany({ age: { $lt: 20 } })`;
+const mongoAggregateQuery = `db.employees.aggregate([{ $match: { department: "HR" } }, { $group: { _id: "$age", count: { $sum: 1 } } }])`;
+
+// Parsing the queries
+parseMongoQuery(mongoFindQuery);
+parseMongoQuery(mongoInsertQuery);
+parseMongoQuery(mongoUpdateQuery);
+parseMongoQuery(mongoDeleteQuery);
+parseMongoQuery(mongoAggregateQuery);
