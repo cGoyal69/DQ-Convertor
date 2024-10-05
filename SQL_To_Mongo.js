@@ -388,37 +388,37 @@ function generateFilter(conditions) {
       const { field, operator, value } = cond;
       switch (operator) {
         case '=':
-          andGroup[field] = value;
+          andGroup[field] = value; // Equality condition
           break;
         case '!=':
-          andGroup[field] = { $ne: value };
+          andGroup[field] = { $ne: value }; // Not equal condition
           break;
         case '>':
-          andGroup[field] = { $gt: value };
+          andGroup[field] = { $gt: value }; // Greater than condition
           break;
         case '<':
-          andGroup[field] = { $lt: value };
+          andGroup[field] = { $lt: value }; // Less than condition
           break;
         case '>=':
-          andGroup[field] = { $gte: value };
+          andGroup[field] = { $gte: value }; // Greater than or equal condition
           break;
         case '<=':
-          andGroup[field] = { $lte: value };
+          andGroup[field] = { $lte: value }; // Less than or equal condition
           break;
         case 'IN':
-          andGroup[field] = { $in: value.split(',').map(v => v.trim()) };
+          andGroup[field] = { $in: value.split(',').map(v => v.trim()) }; // IN condition
           break;
         case 'LIKE':
-          andGroup[field] = { $regex: value.replace(/%/g, '.*') };
+          andGroup[field] = { $regex: value.replace(/%/g, '.*') }; // LIKE condition (converted to regex)
           break;
         case 'NOT IN':
-          andGroup[field] = { $nin: value.split(',').map(v => v.trim()) };
+          andGroup[field] = { $nin: value.split(',').map(v => v.trim()) }; // NOT IN condition
           break;
         case 'IS NOT NULL':
-          andGroup[field] = { $ne: null };
+          andGroup[field] = { $ne: null }; // IS NOT NULL condition
           break;
         case 'IS NULL':
-          andGroup[field] = null;
+          andGroup[field] = null; // IS NULL condition
           break;
         default:
           break;
@@ -430,7 +430,7 @@ function generateFilter(conditions) {
   return orConditions.length > 0 ? { $or: orConditions } : {};
 }
 
-let sqlQuery = `SELECT department, AVG(salary) AS average_salary FROM employees GROUP BY department;`;
+let sqlQuery = `select user from apply where a = b`;
 function toSingleLine(str) {
     return str.replace(/\s+/g, ' ').trim();
 }
