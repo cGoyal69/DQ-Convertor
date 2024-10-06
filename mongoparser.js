@@ -46,35 +46,34 @@ function parseMongoQuery(queryString) {
     }
   
     return parsedQuery;
-  }
+}
+module.exports = parseMongoQuery;
+// Example MongoDB query strings
+// const mongoQueryString1 = `db.users.find({ name: { $eq: "John" }, age: { $gt: 25 } }, { name: 1, age: 1 }).limit(10).sort({ age: -1 })`;
+// const mongoQueryString2 = `db.users.insert({
+//     name: "John Doe",
+//     age: 30,
+//     email: "johndoe@example.com",
+//     address: {
+//       street: "123 Main St",
+//       city: "Anytown",
+//       state: "CA",
+//       zip: "12345"
+//     },
+//     interests: ["music", "sports", "travel"]
+//   });`;
+//   const mongoQueryString3 = `db.orders.aggregate([{ $match: { status: "completed" } }, { $group: { _id: "$customerId", total: { $sum: "$amount" } } }]).limit(5).sort({ total: -1 })`;
   
-  // Example MongoDB query strings
-  const mongoQueryString1 = `db.users.find({ name: { $eq: "John" }, age: { $gt: 25 } }, { name: 1, age: 1 }).limit(10).sort({ age: -1 })`;
-  const mongoQueryString2 = `db.users.insert({
-    name: "John Doe",
-    age: 30,
-    email: "johndoe@example.com",
-    address: {
-      street: "123 Main St",
-      city: "Anytown",
-      state: "CA",
-      zip: "12345"
-    },
-    interests: ["music", "sports", "travel"]
-  });`;
-  const mongoQueryString3 = `db.orders.aggregate([{ $match: { status: "completed" } }, { $group: { _id: "$customerId", total: { $sum: "$amount" } } }]).limit(5).sort({ total: -1 })`;
+//   // Parsing the queries
+//   try {
+//     const parsedQuery1 = parseMongoQuery(mongoQueryString1);
+//     const parsedQuery2 = parseMongoQuery(mongoQueryString2);
+//     const parsedQuery3 = parseMongoQuery(mongoQueryString3);
   
-  // Parsing the queries
-  try {
-    const parsedQuery1 = parseMongoQuery(mongoQueryString1);
-    const parsedQuery2 = parseMongoQuery(mongoQueryString2);
-    const parsedQuery3 = parseMongoQuery(mongoQueryString3);
-  
-    // Output the results
-    console.log(parsedQuery1);
-    console.log(parsedQuery2);
-    console.log(parsedQuery3);
-  } catch (error) {
-    console.error(error.message);
-  }
-  
+//     // Output the results
+//     console.log(parsedQuery1);
+//     console.log(parsedQuery2);
+//     console.log(parsedQuery3);
+//   } catch (error) {
+//     console.error(error.message);
+//   }

@@ -1,3 +1,4 @@
+const parseMongoQuery = require('./mongoparser');
 // Utility functions
 const operatorMap = {
   $eq: '=',
@@ -203,6 +204,19 @@ function convertFindToSQL(query, options = {}) {
 
   return sqlQuery + ';';
 }
+//Insert Command
+function convertInsertToSQL(doc, options = {}) {
+  const columns = Object.keys(doc).join(', ');
+  const values = Object.values(doc)
+    .map((value) => (typeof value === 'string' ? `'${value}'` : value))
+    .join(', ');
+
+  const tableName = options.collection || 'table_name';
+
+  let sqlQuery = `INSERT INTO ${tableName} (${columns}) VALUES (${values});`;
+
+  return sqlQuery;
+}
 
 // Aggregate pipeline converter
 function convertAggregateToSQL(pipeline, options = {}) {
@@ -317,6 +331,8 @@ function handleMongoDBCommand(command) {
     switch (operation) {
       case 'find':
         return convertFindToSQL(query, { collection, projection, sort, limit, skip });
+      case 'insert':
+        return convertInsertToSQL(query, {collection, projection, sort, limit, skip});
       case 'aggregate':
         if (!Array.isArray(query)) {
           throw new Error('Aggregate pipeline must be an array');
@@ -333,77 +349,24 @@ function handleMongoDBCommand(command) {
 
 // Test cases
 function runTests() {
-  const tests = [
-    {
-      name: "Simple find with equality",
-      command: {
-        collection: 'users',
-        operation: 'find',
-        query: { age: 25 }
-      }
+  let tests = [`db.users.find({ name: { $eq: "John" }, age: { $gt: 25 } }, { name: 1, age: 1 }).limit(10).sort({ age: -1 })`,
+    `db.users.insert({ name: "John Doe",
+    age: 30,
+    email: "johndoe@example.com",
+    address: {
+      street: "123 Main St",
+      city: "Anytown",
+      state: "CA",
+      zip: "12345"
     },
-    {
-      name: "Find with multiple conditions",
-      command: {
-        collection: 'users',
-        operation: 'find',
-        query: { age: { $gt: 25, $lt: 50 }, status: "active" }
-      }
-    },
-    {
-      name: "Find with projection",
-      command: {
-        collection: 'users',
-        operation: 'find',
-        query: { status: "active" },
-        projection: { name: 1, age: 1 }
-      }
-    },
-    {
-      name: "Find with complex conditions",
-      command: {
-        collection: 'orders',
-        operation: 'find',
-        query: {
-          $or: [
-            { status: "pending" },
-            { $and: [{ total: { $gt: 100 } }, { customer: "premium" }] }
-          ]
-        }
-      }
-    },
-    {
-      name: "Simple aggregate",
-      command: {
-        collection: 'users',
-        operation: 'find',
-        query: { name: 1, age: 1 },
-        sort: { age: -1 }
-      }
-    },
-    {
-      name: "Complex aggregate",
-      command: {
-        collection: 'sales',
-        operation: 'aggregate',
-        query: [
-          { $match: { date: { $gt: new Date('2024-01-01') } } },
-          { $group: {
-            _id: { month: "$month", category: "$category" },
-            total: { $sum: "$amount" },
-            avg: { $avg: "$amount" }
-          }},
-          { $sort: { total: -1 } },
-          { $limit: 5 }
-        ]
-      }
-    }
-  ];
+    interests: ["music", "sports", "travel"]
+  });`, `db.orders.aggregate([{ $match: { status: "completed" } }, { $group: { _id: "$customerId", total: { $sum: "$amount" } } }]).limit(5).sort({ total: -1 })`];
 
   tests.forEach(test => {
-    console.log(`\nTest: ${test.name}`);
     try {
-      const result = handleMongoDBCommand(test.command);
+      let intermediateQuery = parseMongoQuery(test);
+      console.log(intermediateQuery)
+      const result = handleMongoDBCommand(intermediateQuery);
       console.log("SQL Query:", result);
     } catch (error) {
       console.error("Error:", error.message);
