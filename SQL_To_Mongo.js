@@ -414,8 +414,12 @@ function testQuery(sqlQuery) {
   sqlQuery = sqlQuery.replace(/\s+/g, ' ').trim();
   const intermediateJson = sqlToIntermediateJSON(sqlQuery);
   const mongoQuery = intermediateToMongo(intermediateJson);
-  return mongoQuery;
+  return {
+    intermediateJson,
+    mongoQuery
+  };
 }
+
 
 // Test cases
 const testCases = [
@@ -427,7 +431,9 @@ const testCases = [
 testCases.forEach((sql, index) => {
   console.log(`Test Case ${index + 1}:`);
   console.log('SQL:', sql);
-  console.log('MongoDB:', testQuery(sql));
+  const result = testQuery(sql);
+  console.log('Intermediate JSON:', JSON.stringify(result.intermediateJson, null, 2));
+  console.log('MongoDB Query:', result.mongoQuery);
   console.log('---');
 });
 
