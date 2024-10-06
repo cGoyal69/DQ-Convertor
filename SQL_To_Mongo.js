@@ -153,35 +153,29 @@ function parseOrderByClause(orderByClause) {
 
 // Function to parse WHERE clause
 function parseWhereClause(whereClause) {
-  const conditions = [];
-
-  const conditionRegex = /(\w+)\s*(=|!=|>|<|>=|<=|IN|LIKE|NOT IN|IS NOT NULL|IS NULL)\s*('?[\w\s%]+'?)/g;
-  let match;
-
-  // Handle OR conditions first
-  const orConditions = whereClause.split(/ OR /i).map(part => part.trim());
-
-  orConditions.forEach(orPart => {
-    const andConditions = orPart.split(/ AND /i).map(part => part.trim());
-    const andGroup = [];
-
-    andConditions.forEach(condition => {
-      while ((match = conditionRegex.exec(condition)) !== null) {
-        andGroup.push({
+  // Split on OR first
+  const orParts = whereClause.split(/ OR /i);
+  
+  const orConditions = orParts.map(orPart => {
+    // For each OR part, split on AND
+    const andParts = orPart.split(/ AND /i);
+    
+    return andParts.map(condition => {
+      const match = condition.trim().match(/(\w+)\s*(=|!=|>|<|>=|<=|IN|LIKE|NOT IN|IS NOT NULL|IS NULL)\s*('?[\w\s%]+'?)/);
+      if (match) {
+        return {
           field: match[1],
           operator: match[2],
           value: match[3].replace(/'/g, '')
-        });
+        };
       }
-    });
-
-    if (andGroup.length > 0) {
-      conditions.push(andGroup);
-    }
+      return null;
+    }).filter(Boolean);
   });
 
-  return { or: conditions };
+  return { or: orConditions };
 }
+
 
 // Function to parse UPDATE clause
 function parseUpdateClause(updateClause) {
@@ -380,69 +374,60 @@ function parseJoinClause(joinClause) {
 
 // Helper function to generate filter from conditions
 function generateFilter(conditions) {
-  const orConditions = [];
+  if (!conditions.or || !Array.isArray(conditions.or)) {
+    return {};
+  }
 
-  conditions.or.forEach(andConditions => {
-    const andGroup = {};
-    andConditions.forEach(cond => {
-      const { field, operator, value } = cond;
-      switch (operator) {
-        case '=':
-          andGroup[field] = value; // Equality condition
-          break;
-        case '!=':
-          andGroup[field] = { $ne: value }; // Not equal condition
-          break;
-        case '>':
-          andGroup[field] = { $gt: value }; // Greater than condition
-          break;
-        case '<':
-          andGroup[field] = { $lt: value }; // Less than condition
-          break;
-        case '>=':
-          andGroup[field] = { $gte: value }; // Greater than or equal condition
-          break;
-        case '<=':
-          andGroup[field] = { $lte: value }; // Less than or equal condition
-          break;
-        case 'IN':
-          andGroup[field] = { $in: value.split(',').map(v => v.trim()) }; // IN condition
-          break;
-        case 'LIKE':
-          andGroup[field] = { $regex: value.replace(/%/g, '.*') }; // LIKE condition (converted to regex)
-          break;
-        case 'NOT IN':
-          andGroup[field] = { $nin: value.split(',').map(v => v.trim()) }; // NOT IN condition
-          break;
-        case 'IS NOT NULL':
-          andGroup[field] = { $ne: null }; // IS NOT NULL condition
-          break;
-        case 'IS NULL':
-          andGroup[field] = null; // IS NULL condition
-          break;
-        default:
-          break;
-      }
-    });
-    orConditions.push(andGroup);
+  const orConditions = conditions.or.map(andGroup => {
+    if (andGroup.length === 1) {
+      // Single condition in this OR branch
+      return convertConditionToMongo(andGroup[0]);
+    } else {
+      // Multiple AND conditions
+      const andConditions = andGroup.map(convertConditionToMongo);
+      return { $and: andConditions };
+    }
   });
 
-  return orConditions.length > 0 ? { $or: orConditions } : {};
+  return orConditions.length > 1 ? { $or: orConditions } : orConditions[0];
+}
+function convertConditionToMongo(condition) {
+  const { field, operator, value } = condition;
+  switch (operator) {
+    case '=': return { [field]: value };
+    case '!=': return { [field]: { $ne: value } };
+    case '>': return { [field]: { $gt: value } };
+    case '<': return { [field]: { $lt: value } };
+    case '>=': return { [field]: { $gte: value } };
+    case '<=': return { [field]: { $lte: value } };
+    case 'IN': return { [field]: { $in: value.split(',').map(v => v.trim()) } };
+    case 'NOT IN': return { [field]: { $nin: value.split(',').map(v => v.trim()) } };
+    case 'LIKE': return { [field]: { $regex: value.replace(/%/g, '.*') } };
+    case 'IS NULL': return { [field]: null };
+    case 'IS NOT NULL': return { [field]: { $ne: null } };
+    default: return {};
+  }
 }
 
-let sqlQuery = `select user from apply where a = b`;
-function toSingleLine(str) {
-    return str.replace(/\s+/g, ' ').trim();
-}
-function removeEscapeCharacters(query) {
-  return query.replace(/\\n/g, ' ').replace(/\\/g, '');
+// Test function
+function testQuery(sqlQuery) {
+  sqlQuery = sqlQuery.replace(/\s+/g, ' ').trim();
+  const intermediateJson = sqlToIntermediateJSON(sqlQuery);
+  const mongoQuery = intermediateToMongo(intermediateJson);
+  return mongoQuery;
 }
 
-sqlQuery = toSingleLine(sqlQuery)
-const intermediateJson = sqlToIntermediateJSON(sqlQuery);
-console.log(intermediateJson);
+// Test cases
+const testCases = [
+  "SELECT * FROM users WHERE age > 25 or name = 'John'",
+  "SELECT * FROM products WHERE category = 'electronics' OR price < 100",
+  "SELECT * FROM employees WHERE (department = 'IT' AND salary > 50000) OR (experience > 5 AND title = 'Manager')"
+];
 
-let mongoquery = intermediateToMongo(intermediateJson);
-a = (JSON.stringify(mongoquery, null, 2));
-b = toSingleLine(a)
-console.log(removeEscapeCharacters(b))
+testCases.forEach((sql, index) => {
+  console.log(`Test Case ${index + 1}:`);
+  console.log('SQL:', sql);
+  console.log('MongoDB:', testQuery(sql));
+  console.log('---');
+});
+
