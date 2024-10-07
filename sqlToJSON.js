@@ -8,7 +8,7 @@ const sqlToIntermediateJSON = (sql) => {
     from: /\s+from\s+(\S+|\(.+?\)(?:\s+as\s+\S+)?)/i,
     where: /\s+where\s+(.+?)(?=\s+(?:group by|having|order by|limit|$))/i,
     groupBy: /\s+group by\s+(.+?)(?=\s+(?:having|order by|limit|$))/i,
-    having: /\s+having\s+(.+?)(?=\s+(?:order by|limit|$))/i,
+    having: /\s+having\s+(.+?)(?=\s*(?:order\s+by|limit|offset|$))/i,
     orderBy: /\s+order by\s+(.+?)(?=\s+(?:limit|$))/i,
     limit: /\s+limit\s+(\d+)/i,
     offset: /\s+offset\s+(\d+)/i,
@@ -64,9 +64,9 @@ const sqlToIntermediateJSON = (sql) => {
     }
     
     const havingClause = extractMatch(patterns.having);
-    if (havingClause) {
-      intermediate.having = parseWhereClause(havingClause);
-    }
+  if (havingClause) {
+    intermediate.having = parseHavingClause(havingClause);
+  }
     
     const orderByClause = extractMatch(patterns.orderBy);
     if (orderByClause) {
@@ -276,6 +276,60 @@ const findClosingParenthesis = (tokens, start) => {
   return tokens.length - 1;
 };
 
+const parseHavingClause = (havingClause) => {
+  // First, we'll identify and handle aggregate functions
+  const aggregateFunctionPattern = /(count|sum|avg|min|max)\s*\(([^)]+)\)/gi;
+  let processedClause = havingClause;
+  const aggregateFunctions = {};
+  let match;
+
+  while ((match = aggregateFunctionPattern.exec(havingClause)) !== null) {
+    const fullMatch = match[0];
+    const funcName = match[1].toLowerCase();
+    const argument = match[2].trim();
+    
+    // Create a placeholder that we'll use in parsing
+    const placeholder = `__${funcName}_${argument.replace(/[^\w]/g, '_')}__`;
+    aggregateFunctions[placeholder] = {
+      $function: funcName,
+      argument: argument === '*' ? null : argument
+    };
+    
+    processedClause = processedClause.replace(fullMatch, placeholder);
+  }
+
+  // Now parse the processed clause like a normal WHERE clause
+  let parsedClause = parseWhereClause(processedClause);
+
+  // Replace the placeholders with the actual aggregate function objects
+  const replaceAggregates = (obj) => {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    
+    if (Array.isArray(obj)) {
+      return obj.map(replaceAggregates);
+    }
+    
+    const newObj = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'object' && value !== null) {
+        newObj[key] = replaceAggregates(value);
+      } else if (typeof value === 'string' && aggregateFunctions[value]) {
+        newObj[key] = aggregateFunctions[value];
+      } else if (aggregateFunctions[key]) {
+        newObj[aggregateFunctions[key].$function] = {
+          $field: aggregateFunctions[key].argument,
+          ...value
+        };
+      } else {
+        newObj[key] = value;
+      }
+    }
+    return newObj;
+  };
+
+  return replaceAggregates(parsedClause);
+};
+
 const parseOrderByClause = (orderByClause) => {
   return orderByClause.split(',').reduce((acc, item) => {
     const [field, direction] = item.trim().split(/\s+/);
@@ -326,7 +380,11 @@ const testCases = [
   "SELECT name, age FROM users UNION SELECT name, age FROM employees",
   "INSERT INTO users (name, age, city) VALUES ('John', 30, 'New York'), ('Alice', 25, 'Los Angeles')",
   "UPDATE users SET age = 31, last_login = '2023-05-01' WHERE id = 1",
-  "DELETE FROM users WHERE last_login < '2022-01-01'"
+  "DELETE FROM users WHERE last_login < '2022-01-01'",
+  `SELECT department, COUNT(employee_id) AS employee_count
+FROM employees
+GROUP BY department
+HAVING COUNT(employee_id) > 5;`
 ];
 
 testCases.forEach(testSQLToIntermediate);

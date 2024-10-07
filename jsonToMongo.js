@@ -248,15 +248,17 @@ function testIntermediateToMongo(intermediateJson) {
 
 // Example usage
 const sampleIntermediateJson = {
-  "operation": "update",
+  "operation": "aggregate",
   "collection": "users",
-  "update": {
-    "age": 31,
-    "last_login": "2023-05-01"
-  },
-  "filter": {
-    "id": {
-      "$eq": 1
+  "pipeline": {
+    "match": {
+      "name": "john"
+    },
+    "group": {
+      "_id": "$city",
+      "count": {
+        "sum": "1"
+      }
     }
   }
 };
