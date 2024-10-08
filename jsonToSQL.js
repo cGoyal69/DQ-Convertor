@@ -1,4 +1,4 @@
-const parseMongoQuery = require('./mongoparser');
+const parseMongoQuery = require('./mongoToJSON');
 // Utility functions
 const operatorMap = {
   $eq: '=',

@@ -248,17 +248,42 @@ function testIntermediateToMongo(intermediateJson) {
 
 // Example usage
 const sampleIntermediateJson = {
-  "operation": "update",
-  "collection": "users",
-  "update": {
-    "age": 31,
-    "last_login": "2023-05-01"
-  },
-  "filter": {
-    "id": {
-      "$eq": 1
+  "operation": "aggregate",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "orderDate": {
+          "$gte": { "$date": "2024-01-01T00:00:00Z" },
+          "$lt": { "$date": "2025-01-01T00:00:00Z" }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": "$productId",
+        "totalSales": {
+          "$sum": "$amount"
+        },
+        "orderCount": {
+          "$sum": 1
+        }
+      }
+    },
+    {
+      "$sort": {
+        "totalSales": -1
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "productId": "$_id",
+        "totalSales": 1,
+        "orderCount": 1
+      }
     }
-  }
+  ]
 };
 
 console.log('Sample Intermediate JSON:');
