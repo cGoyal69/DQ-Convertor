@@ -26,16 +26,6 @@ function escapeValue(value) {
   if (Array.isArray(value)) return `(${value.map(escapeValue).join(', ')})`;
   return value;
 }
-function safeParseStage(stage) {
-  if (typeof stage === 'string') {
-    try {
-      return JSON.parse(stage);
-    } catch (e) {
-      return stage;
-    }
-  }
-  return stage;
-}
 
 
 // Function to parse a single condition
