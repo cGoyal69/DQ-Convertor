@@ -64,6 +64,7 @@ function jsonToXml(json) {
 }
 module.exports = jsonToXml;
 
+/*
 // Test case
 const testJson = {
     "operation": "aggregate",
@@ -98,3 +99,4 @@ console.log("Original JSON:");
 console.log(JSON.stringify(testJson, null, 2));
 console.log("\nGenerated XML:");
 console.log(jsonToXml(testJson));
+*/

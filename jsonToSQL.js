@@ -1,6 +1,5 @@
-const parseMongoQuery = require('./mongoToJSON');
-// Utility functions
 
+// Utility functions
 function jsonToSQL(jsonObject)
 {
   const operatorMap = {
@@ -348,6 +347,8 @@ function jsonToSQL(jsonObject)
   }
 }
 
+module.exports = jsonToSQL;
+/*
 
 // Test cases
 function runTests() {
@@ -378,3 +379,4 @@ function runTests() {
 
 // Run the tests
 runTests();
+*/

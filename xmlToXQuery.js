@@ -49,6 +49,9 @@ function xmlToXQuery(xmlString) {
   return xquery.trim();
 }
 module.exports = xmlToXQuery;
+
+
+/*
 const originalXml = `
 <root type="object">
   <numbers>
@@ -76,3 +79,4 @@ console.log("Original XML:");
 console.log(originalXml);
 
 console.log(xmlToXQuery(originalXml));
+*/

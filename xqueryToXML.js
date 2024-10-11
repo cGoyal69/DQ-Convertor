@@ -44,6 +44,7 @@ function xqueryToXml(xquery) {
 }
 module.exports = xqueryToXml;
 
+/*
 
 const originalXml = `
 xquery version "3.1";
@@ -69,3 +70,4 @@ console.log("Original XML:");
 console.log(originalXml);
 
 console.log(xqueryToXml(originalXml));
+*/
