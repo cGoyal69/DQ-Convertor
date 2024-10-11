@@ -42,6 +42,7 @@ function xqueryToXml(xquery) {
 
   return buildXml('root');
 }
+module.exports = xqueryToXml;
 
 
 const originalXml = `

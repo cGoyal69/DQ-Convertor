@@ -69,6 +69,7 @@ function xmlToJson(xmlString) {
 
     return parseNode(xmlDoc.documentElement);
 }
+module.exports = xmlToJson;
 
 // Test case
 const testXml = `<?xml version="1.0" encoding="UTF-8"?><root type="object"><operation type="string">aggregate</operation><collection type="string">users</collection><pipeline type="array"><item><op-match mongo-operator="true"><name type="string">john</name></op-match></item><item><op-group mongo-operator="true"><_id type="string">$city</_id><count><op-sum mongo-operator="true" type="number">1</op-sum></count></op-group></item></pipeline><options><tags type="array"><item type="string">tag1</item><item type="string">tag2</item></tags><nestedArrays type="array"><item type="array"><item type="string">a</item><item type="string">b</item></item><item type="array"><item type="string">c</item><item type="string">d</item></item></nestedArrays></options></root>`;
