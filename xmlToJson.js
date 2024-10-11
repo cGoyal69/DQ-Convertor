@@ -1,5 +1,6 @@
 const { DOMParser } = require('xmldom');
 
+// Function to convert XML back to JSON
 function xmlToJson(xmlString) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
@@ -68,23 +69,13 @@ function xmlToJson(xmlString) {
 
     return parseNode(xmlDoc.documentElement);
 }
-const testCases = [
-    // Test Case 1: MongoDB Query with Operators
-    `<?xml version="1.0" encoding="UTF-8"?><root type="object"><operation type="string">aggregate</operation><pipeline type="array"><item><op-match mongo-operator="true"><age><op-gt mongo-operator="true" type="number">25</op-gt></age><status><op-in mongo-operator="true" type="array"><item type="string">active</item><item type="string">pending</item></op-in></status></op-match></item><item><op-group mongo-operator="true"><_id type="string">$city</_id><count><op-sum mongo-operator="true" type="number">1</op-sum></count><avgAge><op-avg mongo-operator="true" type="string">$age</op-avg></avgAge></op-group></item></pipeline></root>`,
-    // Test Case 2: Complex Nested Arrays
-    `<?xml version="1.0" encoding="UTF-8"?><root type="object"><arrayTypes><simpleArray type="array"><item type="number">1</item><item type="number">2</item><item type="number">3</item><item type="number">4</item></simpleArray><stringArray type="array"><item type="string">a</item><item type="string">b</item><item type="string">c</item></stringArray><mixedArray type="array"><item type="number">1</item><item type="string">two</item><item type="boolean">true</item><item type="boolean">false</item><item type="null"></item></mixedArray><objectArray type="array"><item><name type="string">John</name><age type="number">30</age></item><item><name type="string">Jane</name><age type="number">25</age></item></objectArray><nestedArrays type="array"><item type="array"><item type="number">1</item><item type="number">2</item></item><item type="array"><item type="number">3</item><item type="number">4</item></item><item type="array"><item type="string">a</item><item type="string">b</item></item></nestedArrays></arrayTypes></root>`,
-    // Test Case 3: Mixed Data Types
-    `<root type="object"><numbers><integer type="number">42</integer><float type="number">3.14</float><negative type="number">-17</negative></numbers><booleans><true type="boolean">true</true><false type="boolean">false</false></booleans><nullValue type="null"></nullValue><emptyString type="string"></emptyString><nestedObject><key1 type="string">value1</key1><key2><subkey type="string">subvalue</subkey></key2></nestedObject></root>`
-];
 
+// Test case
+const testXml = `<?xml version="1.0" encoding="UTF-8"?><root type="object"><operation type="string">aggregate</operation><collection type="string">users</collection><pipeline type="array"><item><op-match mongo-operator="true"><name type="string">john</name></op-match></item><item><op-group mongo-operator="true"><_id type="string">$city</_id><count><op-sum mongo-operator="true" type="number">1</op-sum></count></op-group></item></pipeline><options><tags type="array"><item type="string">tag1</item><item type="string">tag2</item></tags><nestedArrays type="array"><item type="array"><item type="string">a</item><item type="string">b</item></item><item type="array"><item type="string">c</item><item type="string">d</item></item></nestedArrays></options></root>`;
 
-
-
-    testCases.forEach((testCase, index) => {
-        console.log(`=== Test Case ${index + 1} ===`);
-    
-        const backToJson = xmlToJson(testCase);
-        console.log("\nConverted back to JSON:");
-        console.log(JSON.stringify(backToJson, null, 2));
-    
-    });
+// Run test
+console.log("XML to JSON Conversion Test\n");
+console.log("Original XML:");
+console.log(testXml);
+console.log("\nConverted JSON:");
+console.log(JSON.stringify(xmlToJson(testXml), null, 2));
