@@ -1,4 +1,4 @@
-function parseMongoQuery(queryString) {
+function mongoToJSON(queryString) {
     // Regular expression to match all MongoDB query types
     const mongoPattern = /db\.(\w+)\.(find|findOne|insert|insertOne|insertMany|update|updateOne|updateMany|delete|deleteOne|deleteMany|aggregate|count|countDocuments|distinct|createIndex|dropIndex|drop|bulkWrite|watch|mapReduce)\(([\s\S]*?)\)(\.(?:sort|limit|skip|project|explain|toArray|forEach|map|hasNext|next|count|size|pretty)\([\s\S]*?\))*/;
     const match = queryString.match(mongoPattern);
@@ -47,7 +47,7 @@ function parseMongoQuery(queryString) {
   
     return parsedQuery;
 }
-module.exports = parseMongoQuery;
+module.exports = mongoToJSON;
 // Example MongoDB query strings
 // const mongoQueryString1 = `db.users.find({ name: { $eq: "John" }, age: { $gt: 25 } }, { name: 1, age: 1 }).limit(10).sort({ age: -1 })`;
 // const mongoQueryString2 = `db.users.insert({

@@ -1,7 +1,7 @@
 const { DOMParser } = require('xmldom');
 
 // Function to convert XML back to JSON
-function xmlToJson(xmlString) {
+function xmlToJSON(xmlString) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
@@ -69,7 +69,7 @@ function xmlToJson(xmlString) {
 
     return parseNode(xmlDoc.documentElement);
 }
-module.exports = xmlToJson;
+module.exports = xmlToJSON;
 
 /*
 // Test case
