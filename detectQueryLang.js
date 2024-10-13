@@ -40,24 +40,6 @@ function detectQueryLang(query) {
                 /\b\$group\b|\b\$match\b|\b\$project\b/i,          // Aggregation operators
             ],
             score: 100
-        },
-        Redis: {
-            patterns: [
-                /^(GET|SET|DEL|INCR|DECR|ZADD|HSET|HMGET|SADD|SREM|LPUSH|RPUSH|LRANGE|LTRIM|BLPOP|BRPOP|ZRANK|ZRANGE|ZREMRANGEBYSCORE|ZRANGEBYSCORE)\s/i  // Redis commands
-            ],
-            score: 100
-        },
-        Neo4j: {
-            patterns: [
-                /\bCYPHER\b/i,
-                /\b(?:MATCH|MERGE|CREATE)\s*\(\w*\s*:\w+\)/i,      // Cypher node pattern
-                /\bRETURN\b/i,                                     // Cypher's RETURN clause
-                /\bWITH\b/i,                                       // WITH clause for result pipelining
-                /\bOPTIONAL MATCH\b/i,                             // Optional matches in Cypher
-                /\bUNWIND\b/i,                                     // UNWIND operation in Cypher
-                /\bFOREACH\b/i,                                    // FOREACH loops in Cypher
-            ],
-            score: 100
         }
     };
 
@@ -67,21 +49,10 @@ function detectQueryLang(query) {
             features: /(\bJOIN\b|\bUNION\b|\bCONSTRAINT\b|\bFOREIGN KEY\b|\bPRIMARY KEY\b|\bCHECK\b|\bDISTINCT\b|\bEXISTS\b|\bLIMIT\b|\bOFFSET\b)/i,
             clauses: /\b(LEFT JOIN|RIGHT JOIN|FULL OUTER JOIN|INNER JOIN|CROSS JOIN|NATURAL JOIN)\b/i
         },
-        Cassandra: {
-            keywords: /\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/i,
-            features: /(\bCONSISTENCY\b|\bTIMESTAMP\b|\bTTL\b|\bCOUNTER\b|\bBATCH\b|\bUSING\b|\bTOKEN\b|\bKEYSPACE\b|\bPRIMARY KEY\b)/i
-        },
+        
         XQuery: {
             keywords: /\b(for|let|where|order by|return|if|then|else|import module|declare|function)\b/i,
             features: /(\$\w+|\bnode\(\)|\btext\(\)|\bcomment\(\)|\bprocessing-instruction\(\)|\bdocument-node\(\))/i
-        },
-        jQuery: {
-            keywords: /\$\(|\$\./,
-            features: /\.(ajax|get|post|ready|on|click|submit|val|text|html|append|prepend|remove|addClass|removeClass|toggleClass|fadeIn|fadeOut|slideUp|slideDown|toggle)/i
-        },
-        RedisCLI: {
-            keywords: /\b(redis-cli|info|monitor|config|client|ping|subscribe|unsubscribe|quit)\b/i,
-            features: /(\bSET\b|\bGET\b|\bPUBLISH\b|\bSUBSCRIBE\b|\bKEYS\b|\bFLUSHALL\b|\bFLUSHDB\b)/i
         }
     };
 
@@ -127,68 +98,20 @@ function detectQueryLang(query) {
 }
 module.exports = detectQueryLang;
 
-
+/*
 // Test queries with expected results
 const testQueries = [
     {
-        query: `let filteredData = users.filter(user => {
-        return user.name === "john";
-    });
-    
-    let groupedData = filteredData.reduce((acc, user) => {
-        let groupKey = user.city;
-        if (!acc[groupKey]) {
-            acc[groupKey] = { totalUsers: 0 };
-        }
-        acc.totalUsers += user.1;
-        return acc;
-    }, {});
-    
-    let projectedData = Object.keys(groupedData).map(groupKey => {
-        return { city: groupKey._id }, { totalUsers: groupKey.1 };
-    });
-    
-    let sortedData = projectedData.sort((a, b) => {
-        
-        if (a.undefined < b.undefined) return 1;
-        if (a.undefined > b.undefined) return -1;
-        
-        return 0;
-    });
-    
-    let limitedData = sortedData.slice(0, 2);
-    
-    let lookedUpData = limitedData.map(item => {
-        let lookupResult = orders.find(lookupItem => lookupItem.city === item.city);
-        return { ...item, orders: lookupResult };
-    });
-    
-    let unwoundData = lookedUpData.reduce((acc, item) => {
-        if (Array.isArray(item.$orders)) {
-            item.$orders.forEach((value, index) => {
-                acc.push({ ...item, $orders: value, orderIndex: index });
-            });
-        } else if (preserveNullAndEmptyArrays) {
-            acc.push(item);
-        }
-        return acc;
-    }, []);
-    
-    let replacedRootData = unwoundData.map(item => {
-        return $orders;
-    });
-    
-    let addedFieldsData = replacedRootData.map(item => {
-        return { ...item, { orderTotal: $total } };
-    });
-    
-    let setFieldsData = addedFieldsData.map(item => {
-        return { ...item, { orderTotal: $total } };
-    });
-    
-    let unsetFieldsData = setFieldsData.map(item => {
-        return { ...item, { total: undefined } };
-    });`,
+        query: `WITH RECURSIVE subordinates AS (
+            SELECT employee_id, manager_id, full_name
+            FROM employees
+            WHERE employee_id = 2
+            UNION ALL
+            SELECT e.employee_id, e.manager_id, e.full_name
+            FROM employees e
+            INNER JOIN subordinates s ON s.employee_id = e.manager_id
+        )
+        SELECT * FROM subordinates;`,
         expected: "JQuery"
     },
     {
@@ -221,3 +144,4 @@ testQueries.forEach(({query, expected}) => {
     const result = detectQueryLang(query);
     console.log(result)
 });
+*/
