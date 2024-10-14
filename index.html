@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DQ Convertor</title>
+    <style>
+        .areaWork{
+            width: 100%;
+            padding: 20px;
+            background-color: aliceblue;
+            display: flex;
+            justify-content: space-around;
+        }
+        #inputBox, #outputBox{
+            height: 100px;
+        }
+        #lang{
+            height:fit-content;
+        }
+    </style>
+</head>
+<body>
+    <div class="areaWork">
+        <textarea name="inputBox" id="inputBox"></textarea>
+        <select name="languages" id="lang">
+            <option value="MongoDB">MongoDB</option>
+            <option value="JQuery">PostgreSQL</option>
+            <option value="MySQL">MySQL</option>
+            <option value="">XQuery</option>
+      </select>
+        <textarea name="outputBox" id="outputBox"></textarea>
+    </div>
+</body>
+</html>
