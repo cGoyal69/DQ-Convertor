@@ -1,15 +1,21 @@
 // JSON to SQL Converter
 
 const jsonToSql = (json) => {
-  json = JSON.parse(json)
+  json = JSON.parse(json);
   switch (json.operation) {
     case 'insert':
+    case 'insertOne':
+    case 'insertMany':
       return insertToSql(json);
     case 'find':
       return findToSql(json);
     case 'update':
+    case 'updateOne':
+    case 'updateMany':
       return updateToSql(json);
     case 'delete':
+    case 'deleteOne':
+    case 'deleteMany':
       return deleteToSql(json);
     case 'createTable':
       return createTableToSql(json);
@@ -17,7 +23,7 @@ const jsonToSql = (json) => {
       return alterTableToSql(json);
     case 'dropTable':
       return dropTableToSql(json);
-    case 'aggregate': // Added support for aggregate
+    case 'aggregate':
       return aggregateToSql(json);
     default:
       throw new Error('Unsupported operation');
@@ -42,6 +48,8 @@ const aggregateToSql = (json) => {
     }
 
     sql += `GROUP BY ${groupBy.$group._id}`;
+  } else {
+    sql += `* FROM ${collection} `;
   }
 
   const sortStage = pipeline.find(stage => stage.$sort);
@@ -49,7 +57,12 @@ const aggregateToSql = (json) => {
     sql += ` ORDER BY ${sortToSql(sortStage.$sort)}`;
   }
 
-  return sql;
+  const limitStage = pipeline.find(stage => stage.$limit);
+  if (limitStage) {
+    sql += ` LIMIT ${limitStage.$limit}`;
+  }
+
+  return sql.trim();
 };
 
 const insertToSql = (json) => {
@@ -61,7 +74,7 @@ const insertToSql = (json) => {
   const values = documents.map(doc => {
     return `(${Object.values(doc).map(formatValue).join(', ')})`;
   }).join(', ');
-  
+
   return `INSERT INTO ${collection} (${columns.join(', ')}) VALUES ${values}`;
 };
 
@@ -155,22 +168,22 @@ const updateToSql = (json) => {
   }
   const setClause = Object.entries(update.$set).map(([field, value]) => `${field} = ${formatValue(value)}`).join(', ');
   let sql = `UPDATE ${collection} SET ${setClause}`;
-  
+
   if (filter) {
     sql += ` WHERE ${filterToSql(filter)}`;
   }
-  
+
   return sql;
 };
 
 const deleteToSql = (json) => {
   const { collection, filter } = json;
   let sql = `DELETE FROM ${collection}`;
-  
+
   if (filter) {
     sql += ` WHERE ${filterToSql(filter)}`;
   }
-  
+
   return sql;
 };
 
@@ -209,35 +222,57 @@ const dropTableToSql = (json) => {
   return `DROP TABLE ${json.tableName}`;
 };
 
-// Example inputs
-const exampleInsert = `{
+// Example Operations
+const exampleAggregate = `{
   "collection": "products",
   "operation": "aggregate",
   "pipeline": [
     {
       "$match": {
-        "avg_price": {
+        "price": {
           "$gt": 100
         }
-      },
+      }
+    },
+    {
       "$group": {
         "_id": "$category",
         "avg_price": {
           "$avg": "$price"
+        },
+        "total_count": {
+          "$sum": 1
         }
-      },
+      }
+    },
+    {
       "$sort": {
         "avg_price": -1
       }
+    },
+    {
+      "$limit": 5
     }
-  ],
-  "sort": {
-    "total": -1
-  },
-  "limit": 5
+  ]
 }`;
 
-const exampleFind = `{"collection":"products","operation":"aggregate","pipeline":[{"$match":{"avg_price":{"$gt":100}}},{"$group":{"_id":"$category","avg_price":{"$avg":"$price"}}},{"$sort":{"avg_price":-1}}],"sort":{"total":-1},"limit":5}`;
+const exampleInsert = `{
+  "collection": "products",
+  "operation": "insertMany",
+  "documents": [
+    {"name": "Product1", "price": 120, "category": "electronics"},
+    {"name": "Product2", "price": 80, "category": "clothing"}
+  ]
+}`;
+
+const exampleFind = `{
+  "collection": "products",
+  "operation": "find",
+  "filter": {"category": "electronics"},
+  "projection": {"name": 1, "price": 1},
+  "sort": {"price": -1},
+  "limit": 10
+}`;
 
 const exampleUpdate = `{
   "operation": "update",
@@ -267,13 +302,13 @@ const exampleDropTable = `{
   "tableName": "users"
 }`;
 
-// Parse and log example operations
-// console.log(jsonToSql(exampleInsert));
-// console.log(jsonToSql(exampleFind));
-// console.log(jsonToSql(exampleUpdate));
-// console.log(jsonToSql(exampleDelete));
-// console.log(jsonToSql(exampleCreateTable));
-// console.log(jsonToSql(exampleDropTable));
-
+// Test the functions
+console.log(jsonToSql(exampleAggregate));
+console.log(jsonToSql(exampleInsert));
+console.log(jsonToSql(exampleFind));
+console.log(jsonToSql(exampleUpdate));
+console.log(jsonToSql(exampleDelete));
+console.log(jsonToSql(exampleCreateTable));
+console.log(jsonToSql(exampleDropTable));
 
 module.exports = jsonToSql;
