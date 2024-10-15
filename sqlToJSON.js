@@ -1,5 +1,3 @@
-// SQL to JSON Converter
-
 const sqlToJson = (sqlQuery) => {
   sqlQuery = sqlQuery.trim().toLowerCase();
   let result = {};
@@ -43,7 +41,7 @@ const parseInsert = (sqlQuery) => {
 const parseSelect = (sqlQuery) => {
   const isAggregate = /\b(sum|avg|min|max|count)\s*\(/i.test(sqlQuery);
   
-  if (isAggregate) {
+  if (isAggregate || /\bgroup\s+by\b/i.test(sqlQuery)) {
     return parseAggregateQuery(sqlQuery);
   }
 
@@ -56,14 +54,6 @@ const parseSelect = (sqlQuery) => {
     
     if (match[3]) {
       result.filter = parseWhereClause(match[3]);
-    }
-    
-    if (match[4]) {
-      result.group = parseGroupBy(match[4]);
-    }
-    
-    if (match[5]) {
-      result.having = parseWhereClause(match[5]);
     }
     
     if (match[6]) {
@@ -100,7 +90,8 @@ const parseAggregateQuery = (sqlQuery) => {
     }
 
     if (match[5]) {
-      result.pipeline.push({ $match: parseWhereClause(match[5]) });
+      const havingMatch = parseWhereClause(match[5]);
+      result.pipeline.push({ $match: havingMatch });
     }
 
     if (match[6]) {
@@ -224,29 +215,23 @@ const parseOrderBy = (orderByClause) => {
 };
 
 const parseWhereClause = (whereClause) => {
-    // Split conditions by 'OR'
-    const orConditions = whereClause.split(/\s+or\s+/i).map(orCondition => {
-      // Each OR condition may contain AND conditions
-      const andConditions = orCondition.split(/\s+and\s+/i).map(andCondition => {
-        const [field, operator, value] = andCondition.split(/\s*(=|!=|>|<|>=|<=|like|in)\s*/i);
-        if (operator.toLowerCase() === 'like') {
-          return { [field]: { $regex: value.replace(/^'|'$/g, '').replace(/%/g, '.*') } };
-        } else if (operator.toLowerCase() === 'in') {
-          return { [field]: { $in: parseInClause(value) } };
-        } else {
-          return { [field]: { [operatorMap[operator.toLowerCase()]]: parseValue(value) } };
-        }
-      });
-  
-      // Return AND conditions as an object with $and
-      return andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+  const orConditions = whereClause.split(/\s+or\s+/i).map(orCondition => {
+    const andConditions = orCondition.split(/\s+and\s+/i).map(andCondition => {
+      const [field, operator, value] = andCondition.split(/\s*(=|!=|>|<|>=|<=|like|in)\s*/i);
+      if (operator.toLowerCase() === 'like') {
+        return { [field]: { $regex: value.replace(/^'|'$/g, '').replace(/%/g, '.*') } };
+      } else if (operator.toLowerCase() === 'in') {
+        return { [field]: { $in: parseInClause(value) } };
+      } else {
+        return { [field]: { [operatorMap[operator.toLowerCase()]]: parseValue(value) } };
+      }
     });
-  
-    // Return OR conditions as an object with $or
-    return orConditions.length > 1 ? { $or: orConditions } : orConditions[0];
-  };
-  
-  
+
+    return andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+  });
+
+  return orConditions.length > 1 ? { $or: orConditions } : orConditions[0];
+};
 
 const parseInClause = (inClause) => {
   return inClause.replace(/^\(|\)$/g, '').split(',').map(v => parseValue(v.trim()));
@@ -281,12 +266,11 @@ const parseValue = (value) => {
 
 const parseColumns = (columnsString) => {
   return columnsString.split(',').map(column => {
-    const [name, type, ...constraints] = column.trim().split(/\s+/);
-    return {
-      name,
-      type,
-      constraints: constraints.map(c => c.toLowerCase())
-    };
+    const parts = column.trim().split(/\s+/);
+    const name = parts[0];
+    const type = parts[1];
+    const constraints = parts.slice(2).map(c => c.toLowerCase());
+    return { name, type, constraints };
   });
 };
 
@@ -334,7 +318,8 @@ const operatorMap = {
   '<=': '$lte'
 };
 
-// const a = `INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)`;
-// console.log ((sqlToJson(a)))
+// Example input
+const a = `select * from users where a = b `;
+console.log(sqlToJson(a));
 
 module.exports = sqlToJson;

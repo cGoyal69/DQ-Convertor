@@ -1,5 +1,5 @@
 function jsonToMongo(Json) {
-    const json = JSON.parse(Json)
+    const json = JSON.parse(Json);
     let queryString = `db.${json.collection}.${json.operation}(`;
     const args = [];
 
@@ -56,7 +56,7 @@ function jsonToMongo(Json) {
 
 // Custom function to stringify arguments
 function stringifyArg(arg) {
-    if (typeof arg === 'object' && !Array.isArray(arg)) {
+    if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
         return `{ ${Object.keys(arg).map(key => `${key}: ${stringifyArg(arg[key])}`).join(', ')} }`;
     } else if (Array.isArray(arg)) {
         return `[ ${arg.map(item => stringifyArg(item)).join(', ')} ]`;
@@ -65,9 +65,9 @@ function stringifyArg(arg) {
     }
 }
 
-// Example inputs for various operations
+// Example input for aggregation
 const examples = [
-   `{"operation":"find","collection":"user","projection":{"dicksize":1},"filter":{"$or":[{"gf":{"$eq":"kavyaa"}},{"lodu":{"$eq":"harsh"}}]},"group":{"_id":"$age"},"having":{"age":{"$gt":18}}}`
+    `{"operation":"find","collection":"users","projection":{},"filter":{"a":{"$eq":"b"}}}`
 ];
 
 // Test each example
