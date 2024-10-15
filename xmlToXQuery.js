@@ -51,26 +51,31 @@ function xmlToXQuery(xmlString) {
 module.exports = xmlToXQuery;
 
 
-/*
+
 const originalXml = `
-<root type="object">
-  <numbers>
-    <integer type="number">42</integer>
-    <float type="number">3.14</float>
-    <negative type="number">-17</negative>
-  </numbers>
-  <booleans>
-    <true type="boolean">true</true>
-    <false type="boolean">false</false>
-  </booleans>
-  <nullValue type="null"></nullValue>
-  <emptyString type="string"></emptyString>
-  <nestedObject>
-    <key1 type="string">value1</key1>
-    <key2>
-      <subkey type="string">subvalue</subkey>
-    </key2>
-  </nestedObject>
+<root>
+  <collection>products</collection>
+  <operation>aggregate</operation>
+  <pipeline>
+    <_dollar_match>
+      <avg_price>
+        <_dollar_gt>100</_dollar_gt>
+      </avg_price>
+    </_dollar_match>
+    <_dollar_group>
+      <_id>$category</_id>
+      <avg_price>
+        <_dollar_avg>$price</_dollar_avg>
+      </avg_price>
+    </_dollar_group>
+    <_dollar_sort>
+      <avg_price>-1</avg_price>
+    </_dollar_sort>
+  </pipeline>
+  <sort>
+    <total>-1</total>
+  </sort>
+  <limit>5</limit>
 </root>
 `;
 
@@ -79,4 +84,3 @@ console.log("Original XML:");
 console.log(originalXml);
 
 console.log(xmlToXQuery(originalXml));
-*/

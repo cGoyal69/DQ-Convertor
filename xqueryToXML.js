@@ -44,30 +44,22 @@ function xqueryToXml(xquery) {
 }
 module.exports = xqueryToXml;
 
-/*
+console.log(xqueryToXml(`xquery version "3.1";
+        let $root := element root { $root_collection, $root_operation, $root_pipeline, $root_sort, $root_limit }
+let $root_collection := element collection { "products" }
+let $root_operation := element operation { "aggregate" }
+let $root_pipeline := element pipeline { $root_pipeline__dollar_match, $root_pipeline__dollar_group, $root_pipeline__dollar_sort }
+let $root_pipeline__dollar_match := element _dollar_match { $root_pipeline__dollar_match_avg_price }
+let $root_pipeline__dollar_match_avg_price := element avg_price { $root_pipeline__dollar_match_avg_price__dollar_gt }
+let $root_pipeline__dollar_match_avg_price__dollar_gt := element _dollar_gt { "100" }
+let $root_pipeline__dollar_group := element _dollar_group { $root_pipeline__dollar_group__id, $root_pipeline__dollar_group_avg_price }
+let $root_pipeline__dollar_group__id := element _id { "$category" }
+let $root_pipeline__dollar_group_avg_price := element avg_price { $root_pipeline__dollar_group_avg_price__dollar_avg }
+let $root_pipeline__dollar_group_avg_price__dollar_avg := element _dollar_avg { "$price" }
+let $root_pipeline__dollar_sort := element _dollar_sort { $root_pipeline__dollar_sort_avg_price }
+let $root_pipeline__dollar_sort_avg_price := element avg_price { "-1" }
+let $root_sort := element sort { $root_sort_total }
+let $root_sort_total := element total { "-1" }
+let $root_limit := element limit { "5" }
 
-const originalXml = `
-xquery version "3.1";
-    let $root := element root { attribute type { "object" }, $root_numbers, $root_booleans, $root_nullValue, $root_emptyString, $root_nestedObject }
-let $root_numbers := element numbers { $root_numbers_integer, $root_numbers_float, $root_numbers_negative }
-let $root_numbers_integer := element integer { attribute type { "number" }, "42" }
-let $root_numbers_float := element float { attribute type { "number" }, "3.14" }
-let $root_numbers_negative := element negative { attribute type { "number" }, "-17" }
-let $root_booleans := element booleans { $root_booleans_true, $root_booleans_false }
-let $root_booleans_true := element true { attribute type { "boolean" }, "true" }
-let $root_booleans_false := element false { attribute type { "boolean" }, "false" }
-let $root_nullValue := element nullValue { attribute type { "null" } }
-let $root_emptyString := element emptyString { attribute type { "string" } }
-let $root_nestedObject := element nestedObject { $root_nestedObject_key1, $root_nestedObject_key2 }
-let $root_nestedObject_key1 := element key1 { attribute type { "string" }, "value1" }
-let $root_nestedObject_key2 := element key2 { $root_nestedObject_key2_subkey }
-let $root_nestedObject_key2_subkey := element subkey { attribute type { "string" }, "subvalue" }
-
-    return $root
-`;
-
-console.log("Original XML:");
-console.log(originalXml);
-
-console.log(xqueryToXml(originalXml));
-*/
+    return $root`))

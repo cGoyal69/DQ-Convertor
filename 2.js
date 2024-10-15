@@ -210,12 +210,30 @@ const dropTableToSql = (json) => {
 
 // Example inputs
 const exampleInsert = `{
-  "operation": "insert",
-  "collection": "users",
-  "documents": [
-    {"name": "John", "age": 30},
-    {"name": "Jane", "age": 25}
-  ]
+  "collection": "products",
+  "operation": "aggregate",
+  "pipeline": [
+    {
+      "$match": {
+        "avg_price": {
+          "$gt": 100
+        }
+      },
+      "$group": {
+        "_id": "$category",
+        "avg_price": {
+          "$avg": "$price"
+        }
+      },
+      "$sort": {
+        "avg_price": -1
+      }
+    }
+  ],
+  "sort": {
+    "total": -1
+  },
+  "limit": 5
 }`;
 
 const exampleFind = `{"collection":"products","operation":"aggregate","pipeline":[{"$match":{"avg_price":{"$gt":100}}},{"$group":{"_id":"$category","avg_price":{"$avg":"$price"}}},{"$sort":{"avg_price":-1}}],"sort":{"total":-1},"limit":5}`;

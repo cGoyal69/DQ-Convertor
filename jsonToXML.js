@@ -64,34 +64,14 @@ function jsonToXml(json) {
 }
 module.exports = jsonToXml;
 
-/*
+
 // Test case
-const testJson = {
-    "operation": "aggregate",
-    "collection": "users",
-    "pipeline": [
-        {
-            "$match": {
-                "name": "john"
-            }
-        },
-        {
-            "$group": {
-                "_id": "$city",
-                "count": {
-                    "$sum": 1
-                }
-            }
-        }
-    ],
-    "options": {
-        "tags": ["tag1", "tag2"],
-        "nestedArrays": [
-            ["a", "b"],
-            ["c", "d"]
-        ]
-    }
-};
+const testJson =`{
+  "operation": "update",
+  "collection": "products",
+  "update": {"$set": {"avg_price": 150}},
+  "filter": {"avg_price": {"$gt": 100}}
+}`;
 
 // Run test
 console.log("JSON to XML Conversion Test\n");
@@ -99,4 +79,3 @@ console.log("Original JSON:");
 console.log(JSON.stringify(testJson, null, 2));
 console.log("\nGenerated XML:");
 console.log(jsonToXml(testJson));
-*/
