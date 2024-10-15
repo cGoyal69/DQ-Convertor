@@ -1,81 +1,35 @@
-// Function to escape XML special characters
-function escapeXml(unsafe) {
-    if (unsafe === undefined || unsafe === null) return '';
-    return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-}
+const { DOMParser, XMLSerializer } = require('xmldom');
 
-// Function to convert JSON to XML
-function jsonToXml(json) {
-    function convertToXml(obj, parentKey) {
-        if (obj === undefined) return '';
-        
-        let xml = '';
+// Convert JSON to XML
+function jsonToXml(obj, parentElement) {
+  for (const prop in obj) {
+    const tagName = prop.replace(/^\$/, '_dollar_');
+    const element = parentElement.appendChild(parentElement.ownerDocument.createElement(tagName));
 
-        if (Array.isArray(obj)) {
-            for (const item of obj) {
-                if (Array.isArray(item)) {
-                    xml += `<item type="array">${convertToXml(item, 'item')}</item>`;
-                } else if (typeof item === 'object' && item !== null) {
-                    xml += `<item>${convertToXml(item, 'item')}</item>`;
-                } else {
-                    const type = item === null ? 'null' : typeof item;
-                    xml += `<item type="${type}">${escapeXml(item)}</item>`;
-                }
-            }
-        } else if (typeof obj === 'object' && obj !== null) {
-            for (let [key, value] of Object.entries(obj)) {
-                const isMongoOperator = key.startsWith('$');
-                const xmlKey = isMongoOperator ? `op-${key.substring(1)}` : key;
-
-                if (typeof value === 'object' && value !== null) {
-                    const attributes = [];
-                    if (isMongoOperator) attributes.push('mongo-operator="true"');
-                    if (Array.isArray(value)) attributes.push('type="array"');
-                    
-                    const attributeString = attributes.length ? ' ' + attributes.join(' ') : '';
-                    xml += `<${xmlKey}${attributeString}>`;
-                    xml += convertToXml(value, xmlKey);
-                    xml += `</${xmlKey}>`;
-                } else {
-                    const attributes = [];
-                    if (isMongoOperator) attributes.push('mongo-operator="true"');
-                    
-                    const type = value === null ? 'null' : typeof value;
-                    attributes.push(`type="${type}"`);
-
-                    const attributeString = attributes.length ? ' ' + attributes.join(' ') : '';
-                    xml += `<${xmlKey}${attributeString}>${escapeXml(value)}</${xmlKey}>`;
-                }
-            }
-        } else {
-            const type = obj === null ? 'null' : typeof obj;
-            xml = escapeXml(obj);
-        }
-
-        return xml;
+    if (typeof obj[prop] === 'object' && !Array.isArray(obj[prop])) {
+      jsonToXml(obj[prop], element);
+    } else if (Array.isArray(obj[prop])) {
+      for (const item of obj[prop]) {
+        jsonToXml(item, element);
+      }
+    } else {
+      const textNode = parentElement.ownerDocument.createTextNode(obj[prop].toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+      element.appendChild(textNode);
     }
-
-    return `<?xml version="1.0" encoding="UTF-8"?><root type="object">${convertToXml(json, 'root')}</root>`;
+  }
 }
-module.exports = jsonToXml;
 
-
-// Test case
-const testJson =`{
-  "operation": "update",
-  "collection": "products",
-  "update": {"$set": {"avg_price": 150}},
-  "filter": {"avg_price": {"$gt": 100}}
-}`;
-
-// Run test
-console.log("JSON to XML Conversion Test\n");
-console.log("Original JSON:");
-console.log(JSON.stringify(testJson, null, 2));
-console.log("\nGenerated XML:");
-console.log(jsonToXml(testJson));
+// Main function to convert JSON to XML
+function convertJsonToXml(originalJson) {
+    const jsonObject = JSON.parse(originalJson);
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString('<root></root>', "text/xml");
+  jsonToXml(jsonObject, xmlDoc.documentElement);
+  return new XMLSerializer().serializeToString(xmlDoc);
+}
+/*
+const a = `{"collection":"products","operation":"aggregate","pipeline":[{"$match":{"avg_price":{"$gt":100}},"$group":{"_id":"$category","avg_price":{"$avg":"$price"}},"$sort":{"avg_price":-1}}],"sort":{"total":-1},"limit":5}`
+console.log(convertJsonToXml(a))
+// Export the function
+*/
+module.exports = convertJsonToXml;

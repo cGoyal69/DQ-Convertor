@@ -1,83 +1,77 @@
 const { DOMParser } = require('xmldom');
 
-// Function to convert XML back to JSON
-function xmlToJSON(xmlString) {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+// Convert XML to JSON
+function xmlToJson(node) {
+  if (node.nodeType === 3) { // text
+    return node.nodeValue.trim();
+  }
 
-    function parseNode(node) {
-        if (!node) return null;
+  let obj = {};
+  if (node.nodeType === 1) { // element
+    for (let j = 0; j < node.attributes.length; j++) {
+      const attribute = node.attributes.item(j);
+      obj[attribute.nodeName] = attribute.nodeValue;
+    }
 
-        if (node.nodeType === 3) {
-            const content = node.nodeValue.trim();
-            return content === '' ? null : content;
+    // Check if the element has text content
+    if (node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
+      return node.childNodes[0].nodeValue.trim();
+    } else {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        const item = node.childNodes.item(i);
+        const nodeName = item.nodeName.replace(/^_dollar_/, '$');
+
+        // Initialize array if it is a pipeline
+        if (nodeName === 'pipeline' && !Array.isArray(obj[nodeName])) {
+          obj[nodeName] = [];
         }
 
-        // Handle arrays
-        if (node.getAttribute('type') === 'array') {
-            const items = Array.from(node.childNodes).filter(child => child.nodeType === 1);
-            return items.map(item => {
-                if (item.getAttribute('type') === 'array') {
-                    // This is a nested array
-                    return parseNode(item);
-                }
-                return parseNodeValue(item);
-            });
-        }
-
-        const children = Array.from(node.childNodes).filter(child => child.nodeType === 1);
-
-        if (children.length === 0) {
-            return parseNodeValue(node);
-        }
-
-        let result = {};
-        children.forEach(child => {
-            let key = child.tagName;
-            
-            // Handle MongoDB operators
-            if (child.getAttribute('mongo-operator') === 'true') {
-                key = `$${key.replace('op-', '')}`;
+        if (item.nodeType === 1) { // element
+          const childObj = xmlToJson(item);
+          if (Array.isArray(obj[nodeName])) {
+            obj[nodeName].push(childObj);
+          } else if (typeof obj[nodeName] === "undefined") {
+            obj[nodeName] = childObj;
+          } else {
+            if (!Array.isArray(obj[nodeName])) {
+              obj[nodeName] = [obj[nodeName]];
             }
-
-            result[key] = parseNodeValue(child);
-        });
-
-        return result;
+            obj[nodeName].push(childObj);
+          }
+        }
+      }
     }
+  }
 
-    function parseNodeValue(node) {
-        const type = node.getAttribute('type');
-        
-        if (type === 'array') {
-            return parseNode(node);
-        }
-
-        if (node.childNodes.length > 1 || (node.firstChild && node.firstChild.nodeType === 1)) {
-            return parseNode(node);
-        }
-
-        const content = node.textContent.trim();
-
-        switch (type) {
-            case 'number': return Number(content);
-            case 'boolean': return content.toLowerCase() === 'true';
-            case 'null': return null;
-            default: return content;
-        }
+  // Convert numeric strings back to numbers
+  for (const key in obj) {
+    if (typeof obj[key] === 'string' && !isNaN(obj[key])) {
+      obj[key] = Number(obj[key]);
     }
+    if (Array.isArray(obj[key])) {
+      obj[key] = obj[key].map(item => {
+        return typeof item === 'string' && !isNaN(item) ? Number(item) : item;
+      });
+    }
+  }
 
-    return parseNode(xmlDoc.documentElement);
+  // Remove _text property
+  if (typeof obj === 'object' && Object.keys(obj).length === 1 && obj._text) {
+    return obj._text;
+  }
+
+  return obj;
 }
-module.exports = xmlToJSON;
 
+// Main function to convert XML to JSON
+function convertXmlToJson(xmlString) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+  return (JSON.stringify(xmlToJson(xmlDoc.documentElement)));
+}
 
-// Test case
-const testXml = `<?xml version="1.0" encoding="UTF-8"?><root type="object"><collection>products</collection><operation>aggregate</operation><pipeline><$match><avg_price><$gt>100</$gt></avg_price></$match></pipeline><pipeline><$group><_id>$category</_id><avg_price><$avg>$price</$avg></avg_price></$group></pipeline><pipeline><$sort><avg_price>-1</avg_price></$sort></pipeline><sort><total>-1</total></sort><limit>5</limit></root>`;
+// const b = `<root><collection>products</collection><operation>aggregate</operation><pipeline><_dollar_match><avg_price><_dollar_gt>100</_dollar_gt></avg_price></_dollar_match><_dollar_group><_id>$category</_id><avg_price><_dollar_avg>$price</_dollar_avg></avg_price></_dollar_group><_dollar_sort><avg_price>-1</avg_price></_dollar_sort></pipeline><sort><total>-1</total></sort><limit>5</limit></root>`
 
-// Run test
-console.log("XML to JSON Conversion Test\n");
-console.log("Original XML:");
-console.log(testXml);
-console.log("\nConverted JSON:");
-console.log(JSON.stringify(xmlToJSON(testXml), null, 2));
+// console.log(convertXmlToJson(b))
+// Export the function
+module.exports = convertXmlToJson;

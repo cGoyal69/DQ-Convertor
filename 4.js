@@ -63,7 +63,7 @@ function stringifyArg(arg) {
         return JSON.stringify(arg);
     }
 }
-
+/*
 // Example inputs for various operations
 const examples = [
     {
@@ -90,13 +90,16 @@ const examples = [
         collection: "users",
         filter: { age: { $lt: 20 } }
     },
-    {
-        operation: "aggregate",
-        collection: "products",
-        pipeline: [
-            { $match: { avg_price: { $gt: 100 } } },
-            { $group: { _id: "$category", avg_price: { $avg: "$price" } } }
-        ]
+   {
+        "collection": "products",
+        "operation": "aggregate",
+        "pipeline": [
+            { "$match": { "avg_price": { "$gt": 100 } } },
+            { "$group": { "_id": "$category", "avg_price": { "$avg": "$price" } } },
+            { "$sort": { "avg_price": -1 } }
+        ],
+        "sort": { "total": -1 },
+        "limit": 5
     }
 ];
 
@@ -104,5 +107,5 @@ const examples = [
 examples.forEach(example => {
     console.log(jsonToMongo(example));
 });
-
+*/
 module.exports = jsonToMongo;

@@ -27,8 +27,9 @@ function convertJsonToXml(originalJson) {
   jsonToXml(jsonObject, xmlDoc.documentElement);
   return new XMLSerializer().serializeToString(xmlDoc);
 }
-
+/*
 const a = `{"collection":"products","operation":"aggregate","pipeline":[{"$match":{"avg_price":{"$gt":100}},"$group":{"_id":"$category","avg_price":{"$avg":"$price"}},"$sort":{"avg_price":-1}}],"sort":{"total":-1},"limit":5}`
 console.log(convertJsonToXml(a))
 // Export the function
+*/
 module.exports = convertJsonToXml;

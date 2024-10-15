@@ -1,7 +1,7 @@
 const { DOMParser, XMLSerializer } = require('xmldom');
 
 // Sample JSON
-const originalJson = {
+const originalJ = `{
   "collection": "products",
   "operation": "aggregate",
   "pipeline": [
@@ -11,7 +11,8 @@ const originalJson = {
   ],
   "sort": { "total": -1 },
   "limit": 5
-};
+}`;
+const originalJson = JSON.parse(originalJ)
 
 // Convert JSON to XML
 function jsonToXml(obj, parentElement) {
@@ -97,10 +98,14 @@ function xmlToJson(node) {
   return obj;
 }
 
+
+
+
 // Compare two JSON objects
 function compareJson(json1, json2) {
   return JSON.stringify(json1) === JSON.stringify(json2);
 }
+
 
 // Main function to perform the conversion and comparison
 function convertAndCompare() {
@@ -124,3 +129,4 @@ function convertAndCompare() {
 
 // Run the conversion and comparison
 convertAndCompare();
+

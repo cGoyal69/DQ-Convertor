@@ -1,301 +1,340 @@
-function sqlToJSON(sqlQuery) {
-  const sqlToIntermediateJSON = (sql) => {
-    const intermediate = {};
-    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+// SQL to JSON Converter
 
-    // Define regex patterns for different SQL clauses
-    const patterns = {
-      select: /^select\s+(.+?)\s+from/i,
-      from: /\s+from\s+(\S+|\(.+?\)(?:\s+as\s+\S+)?)/i,
-      where: /\s+where\s+(.+?)(?=\s+(?:group by|having|order by|limit|$))/i,
-      groupBy: /\s+group by\s+(.+?)(?=\s+(?:having|order by|limit|$))/i,
-      having: /\s+having\s+(.+?)(?=\s*(?:order\s+by|limit|offset|$))/i,
-      orderBy: /\s+order by\s+(.+?)(?=\s+(?:limit|$))/i,
-      limit: /\s+limit\s+(\d+)/i,
-      offset: /\s+offset\s+(\d+)/i,
-      insert: /^insert into\s+(\S+)\s*\((.+?)\)\s*values\s*(.+)$/i,
-      update: /^update\s+(\S+)\s+set\s+(.+?)\s+where\s+(.+)$/i,
-      delete: /^delete from\s+(\S+)(?:\s+where\s+(.+))?$/i,
-      join: /\s+((?:inner|left|right|full|cross)\s+)?join\s+(\S+)\s+(?:as\s+(\S+))?\s*on\s+(.+?)(?=\s+(?:where|group by|having|order by|limit|$))/gi,
-      union: /\s+union\s+(?:all\s+)?/i,
-      subquery: /\((select\s+.+?)\)\s+(?:as\s+(\S+))?/gi
-    };
+const sqlToJson = (sqlQuery) => {
+  sqlQuery = sqlQuery.trim().toLowerCase();
+  let result = {};
 
-    // Helper function to extract matches
-    const extractMatch = (pattern) => {
-      const match = normalizedSql.match(pattern);
-      return match ? match[1] : null;
-    };
+  if (sqlQuery.startsWith('insert')) {
+    return JSON.stringify(parseInsert(sqlQuery));
+  } else if (sqlQuery.startsWith('select')) {
+    return JSON.stringify(parseSelect(sqlQuery));
+  } else if (sqlQuery.startsWith('update')) {
+    return JSON.stringify(parseUpdate(sqlQuery));
+  } else if (sqlQuery.startsWith('delete')) {
+    return JSON.stringify(parseDelete(sqlQuery));
+  } else if (sqlQuery.startsWith('create table')) {
+    return JSON.stringify(parseCreateTable(sqlQuery));
+  } else if (sqlQuery.startsWith('alter table')) {
+    return JSON.stringify(parseAlterTable(sqlQuery));
+  } else if (sqlQuery.startsWith('drop table')) {
+    return JSON.stringify(parseDropTable(sqlQuery));
+  }
 
-    // Determine the operation type
-    if (normalizedSql.toLowerCase().startsWith('select')) {
-      intermediate.operation = 'find';
-      if (normalizedSql.includes('group by') || /\b(count|sum|avg|min|max)\s*\(/i.test(normalizedSql)) {
-        intermediate.operation = 'aggregate';
-      }
-    } else if (normalizedSql.toLowerCase().startsWith('insert')) {
-      intermediate.operation = 'insert';
-    } else if (normalizedSql.toLowerCase().startsWith('update')) {
-      intermediate.operation = 'update';
-    } else if (normalizedSql.toLowerCase().startsWith('delete')) {
-      intermediate.operation = 'delete';
-    }
-
-    // Parse different clauses
-    if (intermediate.operation === 'find' || intermediate.operation === 'aggregate') {
-      intermediate.projection = parseProjection(extractMatch(patterns.select));
-      
-      const fromClause = extractMatch(patterns.from);
-      if (fromClause) {
-        if (fromClause.startsWith('(')) {
-          intermediate.from = parseSubquery(fromClause);
-        } else {
-          intermediate.collection = fromClause;
-        }
-      }
-      
-      const whereClause = extractMatch(patterns.where);
-      if (whereClause) {
-        intermediate.filter = parseWhereClause(whereClause);
-      }
-      
-      const groupByClause = extractMatch(patterns.groupBy);
-      if (groupByClause) {
-        intermediate.groupBy = groupByClause.split(',').map(field => field.trim());
-      }
-      
-      const havingClause = extractMatch(patterns.having);
-      if (havingClause) {
-        intermediate.having = parseHavingClause(havingClause);
-      }
-      
-      const orderByClause = extractMatch(patterns.orderBy);
-      if (orderByClause) {
-        intermediate.sort = parseOrderByClause(orderByClause);
-      }
-      
-      const limitClause = extractMatch(patterns.limit);
-      if (limitClause) {
-        intermediate.limit = parseInt(limitClause, 10);
-      }
-      
-      const offsetClause = extractMatch(patterns.offset);
-      if (offsetClause) {
-        intermediate.skip = parseInt(offsetClause, 10);
-      }
-      
-      // Handle JOINs
-      const joins = [];
-      let joinMatch;
-      while ((joinMatch = patterns.join.exec(normalizedSql)) !== null) {
-        joins.push({
-          type: joinMatch[1] ? joinMatch[1].trim() : 'inner',
-          collection: joinMatch[2],
-          alias: joinMatch[3] || null,
-          on: parseJoinCondition(joinMatch[4])
-        });
-      }
-      if (joins.length > 0) {
-        intermediate.joins = joins;
-      }
-      
-      // Handle UNIONs
-      if (patterns.union.test(normalizedSql)) {
-        intermediate.union = normalizedSql.split(patterns.union).map(query => sqlToIntermediateJSON(query.trim()));
-      }
-      
-      // Handle subqueries
-      const subqueries = [];
-      let subqueryMatch;
-      while ((subqueryMatch = patterns.subquery.exec(normalizedSql)) !== null) {
-        subqueries.push({
-          query: sqlToIntermediateJSON(subqueryMatch[1]),
-          alias: subqueryMatch[2] || null
-        });
-      }
-      if (subqueries.length > 0) {
-        intermediate.subqueries = subqueries;
-      }
-    } else if (intermediate.operation === 'insert') {
-      const insertMatch = normalizedSql.match(patterns.insert);
-      if (insertMatch) {
-        intermediate.collection = insertMatch[1];
-        const fields = insertMatch[2].split(',').map(f => f.trim());
-        const valuesList = insertMatch[3].split(/\),\s*\(/).map(v => v.replace(/[()]/g, '').split(',').map(item => item.trim().replace(/^'|'$/g, '')));
-        intermediate.documents = valuesList.map(values => {
-          return fields.reduce((acc, field, index) => {
-            acc[field] = parseValue(values[index]);
-            return acc;
-          }, {});
-        });
-      }
-    } else if (intermediate.operation === 'update') {
-      const updateMatch = normalizedSql.match(patterns.update);
-      if (updateMatch) {
-        intermediate.collection = updateMatch[1];
-        intermediate.update = parseUpdateClause(updateMatch[2]);
-        intermediate.filter = parseWhereClause(updateMatch[3]);
-      }
-    } else if (intermediate.operation === 'delete') {
-      const deleteMatch = normalizedSql.match(patterns.delete);
-      if (deleteMatch) {
-        intermediate.collection = deleteMatch[1];
-        if (deleteMatch[2]) {
-          intermediate.filter = parseWhereClause(deleteMatch[2]);
-        }
-      }
-    }
-
-    return intermediate;
-  };
-
-  const parseProjection = (projectionString) => {
-    if (!projectionString || projectionString === '*') return {};
-    return projectionString.split(',').reduce((acc, field) => {
-      const [name, alias] = field.trim().split(/\s+as\s+/i);
-      acc[alias || name] = 1;
-      return acc;
-    }, {});
-  };
-
-  const parseWhereClause = (whereClause) => {
-    const tokens = tokenizeWhereClause(whereClause);
-    return parseConditions(tokens);
-  };
-
-  const tokenizeWhereClause = (whereClause) => {
-    const regex = /([()]|AND|OR|\bIN\b|\bLIKE\b|\bBETWEEN\b|!=|>=|<=|>|<|=|'[^']*'|\S+)/gi;
-    return whereClause.match(regex) || [];
-  };
-
-  const parseConditions = (tokens, depth = 0) => {
-    const result = {};
-    let currentOperator = '$and';
-    let currentCondition = [];
-
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i].toUpperCase();
-
-      if (token === '(') {
-        const subCondition = parseConditions(tokens.slice(i + 1), depth + 1);
-        const closingIndex = findClosingParenthesis(tokens, i);
-        i = closingIndex;
-        currentCondition.push(subCondition);
-      } else if (token === ')') {
-        if (depth > 0) break;
-      } else if (token === 'AND' || token === 'OR') {
-        if (currentCondition.length > 0) {
-          result[currentOperator] = result[currentOperator] || [];
-          result[currentOperator].push(
-            currentCondition.length === 1 ? currentCondition[0] : { $and: currentCondition }
-          );
-          currentCondition = [];
-        }
-        currentOperator = token === 'AND' ? '$and' : '$or';
-      } else {
-        const condition = parseCondition(tokens.slice(i));
-        i += condition.tokenCount - 1;
-        currentCondition.push(condition);
-      }
-    }
-
-    if (currentCondition.length > 0) {
-      result[currentOperator] = result[currentOperator] || [];
-      result[currentOperator].push(
-        currentCondition.length === 1 ? currentCondition[0] : { $and: currentCondition }
-      );
-    }
-
-    return result;
-  };
-
-  const parseCondition = (tokens) => {
-    // Implement condition parsing logic here based on the first token
-    // This is a placeholder to demonstrate the structure
-    const field = tokens[0].replace(/['"]/g, '');
-    const operator = tokens[1];
-    const value = parseValue(tokens[2].replace(/['"]/g, ''));
-
-    return { [field]: { [`$${operator}`]: value } };
-  };
-
-  const findClosingParenthesis = (tokens, start) => {
-    let depth = 1;
-    for (let i = start + 1; i < tokens.length; i++) {
-      if (tokens[i] === '(') depth++;
-      if (tokens[i] === ')') depth--;
-      if (depth === 0) return i;
-    }
-    return -1; // Not found
-  };
-
-  const parseUpdateClause = (updateClause) => {
-    const updates = {};
-    const assignments = updateClause.split(',').map(assignment => assignment.trim());
-    for (const assignment of assignments) {
-      const [field, value] = assignment.split('=').map(item => item.trim());
-      updates[field] = parseValue(value.replace(/^'|'$/g, ''));
-    }
-    return updates;
-  };
-
-  const parseOrderByClause = (orderByClause) => {
-    return orderByClause.split(',').map(field => {
-      const [name, order] = field.trim().split(/\s+/);
-      return { [name]: order ? (order.toLowerCase() === 'desc' ? -1 : 1) : 1 };
-    });
-  };
-
-  const parseJoinCondition = (onClause) => {
-    // Implement join condition parsing logic here
-    return onClause; // Placeholder, implement parsing logic
-  };
-
-  const parseValue = (value) => {
-    if (!isNaN(value)) return parseFloat(value);
-    if (value === 'true' || value === 'false') return value === 'true';
-    if (value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1);
-    return value; // Return as string by default
-  };
-
-  const parseSubquery = (subquery) => {
-    return sqlToIntermediateJSON(subquery);
-  };
-
-  return sqlToIntermediateJSON(sqlQuery);
-}
-
-
-// Export the function
-module.exports = sqlToJSON;
-
-// Test functionz
-const testSQLToIntermediate = (sqlQuery) => {
-  console.log('SQL:', sqlQuery);
-  console.log('Intermediate JSON:', sqlToJSON(sqlQuery));
-  console.log('---');
+  throw new Error('Unsupported SQL operation');
 };
 
-// Test cases
-const testCases = [
-  `SELECT name, fine FROM hello WHERE job = 'active' AND name = 'Kavyaa'`,
-  `SELECT name, age FROM employees WHERE department = 'IT' AND salary > 50000 ORDER BY age DESC LIMIT 10`,
-  `INSERT INTO products (name, price, category) VALUES ('New Product', 19.99, 'Electronics')`,
-  `UPDATE customers SET last_visit = '2023-04-15' WHERE id = 1234`,
-  `DELETE FROM orders WHERE order_date < '2023-01-01'`,
-  `SELECT e.name, d.department_name 
-   FROM employees e 
-   INNER JOIN departments d ON e.department_id = d.id 
-   WHERE e.salary > 60000`,
-  `SELECT department, AVG(salary) as avg_salary 
-   FROM employees 
-   GROUP BY department 
-   HAVING AVG(salary) > 55000`,
-  `SELECT * FROM (SELECT name, age FROM employees WHERE age > 30) AS senior_employees`,
-  `SELECT * FROM users 
-   UNION 
-   SELECT * FROM archived_users`,
-];
+const parseInsert = (sqlQuery) => {
+  const result = { operation: 'insert' };
+  const match = sqlQuery.match(/insert\s+into\s+(\w+)\s*\((.*?)\)\s*values\s*\((.*?)\)/is);
+  
+  if (match) {
+    result.collection = match[1];
+    const columns = match[2].split(',').map(col => col.trim());
+    const values = match[3].split(',').map(val => parseValue(val.trim()));
 
-// Run test cases
-testCases.forEach(testSQLToIntermediate);
+    result.documents = [{
+      ...Object.fromEntries(columns.map((col, i) => [col, values[i]]))
+    }];
+  }
+
+  return result;
+};
+
+const parseSelect = (sqlQuery) => {
+  const isAggregate = /\b(sum|avg|min|max|count)\s*\(/i.test(sqlQuery);
+  
+  if (isAggregate) {
+    return parseAggregateQuery(sqlQuery);
+  }
+
+  const result = { operation: 'find' };
+  const match = sqlQuery.match(/select\s+(.*?)\s+from\s+(\w+)(?:\s+where\s+(.*?))?(?:\s+group\s+by\s+(.*?))?(?:\s+having\s+(.*?))?(?:\s+order\s+by\s+(.*?))?(?:\s+limit\s+(\d+))?(?:\s+offset\s+(\d+))?$/is);
+
+  if (match) {
+    result.collection = match[2];
+    result.projection = match[1] === '*' ? {} : parseProjection(match[1]);
+    
+    if (match[3]) {
+      result.filter = parseWhereClause(match[3]);
+    }
+    
+    if (match[4]) {
+      result.group = parseGroupBy(match[4]);
+    }
+    
+    if (match[5]) {
+      result.having = parseWhereClause(match[5]);
+    }
+    
+    if (match[6]) {
+      result.sort = parseOrderBy(match[6]);
+    }
+    
+    if (match[7]) {
+      result.limit = parseInt(match[7]);
+    }
+    
+    if (match[8]) {
+      result.skip = parseInt(match[8]);
+    }
+  }
+
+  return result;
+};
+
+const parseAggregateQuery = (sqlQuery) => {
+  const result = { operation: 'aggregate', pipeline: [] };
+  const match = sqlQuery.match(/select\s+(.*?)\s+from\s+(\w+)(?:\s+where\s+(.*?))?(?:\s+group\s+by\s+(.*?))?(?:\s+having\s+(.*?))?(?:\s+order\s+by\s+(.*?))?(?:\s+limit\s+(\d+))?(?:\s+offset\s+(\d+))?$/is);
+
+  if (match) {
+    result.collection = match[2];
+
+    if (match[3]) {
+      result.pipeline.push({ $match: parseWhereClause(match[3]) });
+    }
+
+    if (match[4]) {
+      const groupStage = parseGroupBy(match[4]);
+      const aggregations = parseAggregations(match[1]);
+      result.pipeline.push({ $group: { ...groupStage, ...aggregations } });
+    }
+
+    if (match[5]) {
+      result.pipeline.push({ $match: parseWhereClause(match[5]) });
+    }
+
+    if (match[6]) {
+      result.pipeline.push({ $sort: parseOrderBy(match[6]) });
+    }
+
+    if (match[7]) {
+      result.pipeline.push({ $limit: parseInt(match[7]) });
+    }
+
+    if (match[8]) {
+      result.pipeline.push({ $skip: parseInt(match[8]) });
+    }
+  }
+
+  return result;
+};
+
+const parseUpdate = (sqlQuery) => {
+  const result = { operation: 'update' };
+  const match = sqlQuery.match(/update\s+(\w+)\s+set\s+(.*?)(?:\s+where\s+(.*?))?$/is);
+  
+  if (match) {
+    result.collection = match[1];
+    result.update = { $set: parseSetClause(match[2]) };
+    
+    if (match[3]) {
+      result.filter = parseWhereClause(match[3]);
+    }
+  }
+
+  return result;
+};
+
+const parseDelete = (sqlQuery) => {
+  const result = { operation: 'delete' };
+  const match = sqlQuery.match(/delete\s+from\s+(\w+)(?:\s+where\s+(.*?))?$/is);
+  
+  if (match) {
+    result.collection = match[1];
+    
+    if (match[2]) {
+      result.filter = parseWhereClause(match[2]);
+    }
+  }
+
+  return result;
+};
+
+const parseCreateTable = (sqlQuery) => {
+  const result = { operation: 'createTable' };
+  const match = sqlQuery.match(/create\s+table\s+(\w+)\s*\((.*?)\)/is);
+
+  if (match) {
+    result.tableName = match[1];
+    result.columns = parseColumns(match[2]);
+  }
+
+  return result;
+};
+
+const parseAlterTable = (sqlQuery) => {
+  const result = { operation: 'alterTable' };
+  const match = sqlQuery.match(/alter\s+table\s+(\w+)\s+(.*)/is);
+
+  if (match) {
+    result.tableName = match[1];
+    result.alterations = parseAlterations(match[2]);
+  }
+
+  return result;
+};
+
+const parseDropTable = (sqlQuery) => {
+  const result = { operation: 'dropTable' };
+  const match = sqlQuery.match(/drop\s+table\s+(\w+)/is);
+
+  if (match) {
+    result.tableName = match[1];
+  }
+
+  return result;
+};
+
+// Helper functions
+
+const parseProjection = (projectionString) => {
+  return Object.fromEntries(
+    projectionString.split(',').map(field => {
+      field = field.trim();
+      const [name, alias] = field.split(/\s+as\s+/i);
+      return [alias || name, 1];
+    })
+  );
+};
+
+const parseAggregations = (selectClause) => {
+  const aggregations = {};
+  const regex = /(\w+)\((\w+)\)(?:\s+as\s+(\w+))?/gi;
+  let match;
+  while ((match = regex.exec(selectClause)) !== null) {
+    const [, func, field, alias] = match;
+    const key = alias || `${func}_${field}`;
+    aggregations[key] = { [`$${func.toLowerCase()}`]: `$${field}` };
+  }
+  return aggregations;
+};
+
+const parseGroupBy = (groupByClause) => {
+  const fields = groupByClause.split(',').map(field => field.trim());
+  return { _id: fields.length === 1 ? `$${fields[0]}` : Object.fromEntries(fields.map(f => [f, `$${f}`])) };
+};
+
+const parseOrderBy = (orderByClause) => {
+  return Object.fromEntries(
+    orderByClause.split(',').map(item => {
+      const [field, direction] = item.trim().split(/\s+/);
+      return [field, direction && direction.toLowerCase() === 'desc' ? -1 : 1];
+    })
+  );
+};
+
+const parseWhereClause = (whereClause) => {
+    // Split conditions by 'OR'
+    const orConditions = whereClause.split(/\s+or\s+/i).map(orCondition => {
+      // Each OR condition may contain AND conditions
+      const andConditions = orCondition.split(/\s+and\s+/i).map(andCondition => {
+        const [field, operator, value] = andCondition.split(/\s*(=|!=|>|<|>=|<=|like|in)\s*/i);
+        if (operator.toLowerCase() === 'like') {
+          return { [field]: { $regex: value.replace(/^'|'$/g, '').replace(/%/g, '.*') } };
+        } else if (operator.toLowerCase() === 'in') {
+          return { [field]: { $in: parseInClause(value) } };
+        } else {
+          return { [field]: { [operatorMap[operator.toLowerCase()]]: parseValue(value) } };
+        }
+      });
+  
+      // Return AND conditions as an object with $and
+      return andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+    });
+  
+    // Return OR conditions as an object with $or
+    return orConditions.length > 1 ? { $or: orConditions } : orConditions[0];
+  };
+  
+  
+
+const parseInClause = (inClause) => {
+  return inClause.replace(/^\(|\)$/g, '').split(',').map(v => parseValue(v.trim()));
+};
+
+const parseSetClause = (setClause) => {
+  const assignments = setClause.split(',');
+  return Object.fromEntries(assignments.map(assignment => {
+    const [field, value] = assignment.split('=').map(s => s.trim());
+    return [field, parseValue(value)];
+  }));
+};
+
+const parseValue = (value) => {
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  }
+  if (value.toLowerCase() === 'null') {
+    return null;
+  }
+  if (value.toLowerCase() === 'true') {
+    return true;
+  }
+  if (value.toLowerCase() === 'false') {
+    return false;
+  }
+  if (!isNaN(value)) {
+    return Number(value);
+  }
+  return value;
+};
+
+const parseColumns = (columnsString) => {
+  return columnsString.split(',').map(column => {
+    const [name, type, ...constraints] = column.trim().split(/\s+/);
+    return {
+      name,
+      type,
+      constraints: constraints.map(c => c.toLowerCase())
+    };
+  });
+};
+
+const parseAlterations = (alterationsString) => {
+  const alterations = [];
+  const addColumnRegex = /add\s+column\s+(\w+)\s+(\w+)(?:\s+(.*))?/i;
+  const dropColumnRegex = /drop\s+column\s+(\w+)/i;
+  const modifyColumnRegex = /modify\s+column\s+(\w+)\s+(\w+)(?:\s+(.*))?/i;
+
+  alterationsString.split(',').forEach(alteration => {
+    alteration = alteration.trim();
+    let match;
+
+    if ((match = addColumnRegex.exec(alteration))) {
+      alterations.push({
+        type: 'addColumn',
+        name: match[1],
+        dataType: match[2],
+        constraints: match[3] ? match[3].split(/\s+/) : []
+      });
+    } else if ((match = dropColumnRegex.exec(alteration))) {
+      alterations.push({
+        type: 'dropColumn',
+        name: match[1]
+      });
+    } else if ((match = modifyColumnRegex.exec(alteration))) {
+      alterations.push({
+        type: 'modifyColumn',
+        name: match[1],
+        newDataType: match[2],
+        newConstraints: match[3] ? match[3].split(/\s+/) : []
+      });
+    }
+  });
+
+  return alterations;
+};
+
+const operatorMap = {
+  '=': '$eq',
+  '!=': '$ne',
+  '>': '$gt',
+  '<': '$lt',
+  '>=': '$gte',
+  '<=': '$lte'
+};
+
+// const a = `INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)`;
+// console.log ((sqlToJson(a)))
+
+module.exports = sqlToJson;

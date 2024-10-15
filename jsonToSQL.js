@@ -1,6 +1,7 @@
 // JSON to SQL Converter
 
 const jsonToSql = (json) => {
+  json = JSON.parse(json)
   switch (json.operation) {
     case 'insert':
       return insertToSql(json);
@@ -207,15 +208,33 @@ const alterTableToSql = (json) => {
 const dropTableToSql = (json) => {
   return `DROP TABLE ${json.tableName}`;
 };
-
+/*
 // Example inputs
 const exampleInsert = `{
-  "operation": "insert",
-  "collection": "users",
-  "documents": [
-    {"name": "John", "age": 30},
-    {"name": "Jane", "age": 25}
-  ]
+  "collection": "products",
+  "operation": "aggregate",
+  "pipeline": [
+    {
+      "$match": {
+        "avg_price": {
+          "$gt": 100
+        }
+      },
+      "$group": {
+        "_id": "$category",
+        "avg_price": {
+          "$avg": "$price"
+        }
+      },
+      "$sort": {
+        "avg_price": -1
+      }
+    }
+  ],
+  "sort": {
+    "total": -1
+  },
+  "limit": 5
 }`;
 
 const exampleFind = `{"collection":"products","operation":"aggregate","pipeline":[{"$match":{"avg_price":{"$gt":100}}},{"$group":{"_id":"$category","avg_price":{"$avg":"$price"}}},{"$sort":{"avg_price":-1}}],"sort":{"total":-1},"limit":5}`;
@@ -249,11 +268,12 @@ const exampleDropTable = `{
 }`;
 
 // Parse and log example operations
-console.log(jsonToSql(JSON.parse(exampleInsert)));
-console.log(jsonToSql(JSON.parse(exampleFind)));
-console.log(jsonToSql(JSON.parse(exampleUpdate)));
-console.log(jsonToSql(JSON.parse(exampleDelete)));
-console.log(jsonToSql(JSON.parse(exampleCreateTable)));
-console.log(jsonToSql(JSON.parse(exampleDropTable)));
+console.log(jsonToSql(exampleInsert));
+console.log(jsonToSql(exampleFind));
+console.log(jsonToSql(exampleUpdate));
+console.log(jsonToSql(exampleDelete));
+console.log(jsonToSql(exampleCreateTable));
+console.log(jsonToSql(exampleDropTable));
+*/
 
 module.exports = jsonToSql;

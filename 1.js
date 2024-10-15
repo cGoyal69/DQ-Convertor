@@ -5,19 +5,19 @@ const sqlToJson = (sqlQuery) => {
   let result = {};
 
   if (sqlQuery.startsWith('insert')) {
-    return parseInsert(sqlQuery);
+    return JSON.stringify(parseInsert(sqlQuery));
   } else if (sqlQuery.startsWith('select')) {
-    return parseSelect(sqlQuery);
+    return JSON.stringify(parseSelect(sqlQuery));
   } else if (sqlQuery.startsWith('update')) {
-    return parseUpdate(sqlQuery);
+    return JSON.stringify(parseUpdate(sqlQuery));
   } else if (sqlQuery.startsWith('delete')) {
-    return parseDelete(sqlQuery);
+    return JSON.stringify(parseDelete(sqlQuery));
   } else if (sqlQuery.startsWith('create table')) {
-    return parseCreateTable(sqlQuery);
+    return JSON.stringify(parseCreateTable(sqlQuery));
   } else if (sqlQuery.startsWith('alter table')) {
-    return parseAlterTable(sqlQuery);
+    return JSON.stringify(parseAlterTable(sqlQuery));
   } else if (sqlQuery.startsWith('drop table')) {
-    return parseDropTable(sqlQuery);
+    return JSON.stringify(parseDropTable(sqlQuery));
   }
 
   throw new Error('Unsupported SQL operation');
@@ -334,7 +334,7 @@ const operatorMap = {
   '<=': '$lte'
 };
 
-const a = `INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)`;
-console.log (JSON.stringify((sqlToJson(a))))
+// const a = `INSERT INTO users (name, age) VALUES ('John', 30), ('Jane', 25)`;
+// console.log ((sqlToJson(a)))
 
 module.exports = sqlToJson;

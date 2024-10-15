@@ -67,11 +67,11 @@ function xmlToJson(node) {
 function convertXmlToJson(xmlString) {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-  return xmlToJson(xmlDoc.documentElement);
+  return (JSON.stringify(xmlToJson(xmlDoc.documentElement)));
 }
 
-const b = `<root><collection>products</collection><operation>aggregate</operation><pipeline><_dollar_match><avg_price><_dollar_gt>100</_dollar_gt></avg_price></_dollar_match><_dollar_group><_id>$category</_id><avg_price><_dollar_avg>$price</_dollar_avg></avg_price></_dollar_group><_dollar_sort><avg_price>-1</avg_price></_dollar_sort></pipeline><sort><total>-1</total></sort><limit>5</limit></root>`
+// const b = `<root><collection>products</collection><operation>aggregate</operation><pipeline><_dollar_match><avg_price><_dollar_gt>100</_dollar_gt></avg_price></_dollar_match><_dollar_group><_id>$category</_id><avg_price><_dollar_avg>$price</_dollar_avg></avg_price></_dollar_group><_dollar_sort><avg_price>-1</avg_price></_dollar_sort></pipeline><sort><total>-1</total></sort><limit>5</limit></root>`
 
-console.log(JSON.stringify(convertXmlToJson(b)))
+// console.log(convertXmlToJson(b))
 // Export the function
 module.exports = convertXmlToJson;
