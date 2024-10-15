@@ -68,7 +68,7 @@ function stringifyArg(arg) {
         return JSON.stringify(arg);
     }
 }
-
+/*
 // Example input for update operation
 const examples = [
     `{"collection":"collection","operation":"updateMany","filter":{"city":"New York"},"update":{"$set":{"city":"San Francisco"}}}`
@@ -78,5 +78,5 @@ const examples = [
 examples.forEach(example => {
     console.log(jsonToMongo(example));
 });
-
+*/
 module.exports = jsonToMongo;
