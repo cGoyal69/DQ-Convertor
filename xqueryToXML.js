@@ -43,7 +43,7 @@ function xqueryToXml(xquery) {
   return buildXml('root');
 }
 module.exports = xqueryToXml;
-
+/*
 console.log(xqueryToXml(`xquery version "3.1";
         let $root := element root { $root_collection, $root_operation, $root_pipeline, $root_sort, $root_limit }
 let $root_collection := element collection { "products" }
@@ -63,3 +63,4 @@ let $root_sort_total := element total { "-1" }
 let $root_limit := element limit { "5" }
 
     return $root`))
+  */

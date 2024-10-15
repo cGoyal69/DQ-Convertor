@@ -1,0 +1,99 @@
+import sqlparse
+from sqlparse.sql import IdentifierList, Identifier, Function, Where, Comparison
+from sqlparse.tokens import Keyword, DML, Punctuation
+
+def postgresql_to_json(sql_query):
+    parsed = sqlparse.parse(sql_query)[0]
+    
+    def process_token(token):
+        if isinstance(token, IdentifierList):
+            return [process_token(identifier) for identifier in token.get_identifiers()]
+        elif isinstance(token, Identifier):
+            return token.get_real_name()
+        elif isinstance(token, Function):
+            return {
+                "function": token.get_real_name(),
+                "arguments": process_token(token.get_parameters())
+            }
+        elif isinstance(token, Comparison):
+            return {
+                "field": process_token(token.left),
+                "operator": token.operator.value,
+                "value": process_token(token.right)
+            }
+        elif isinstance(token, Where):
+            return {"$match": process_where_clause(token)}
+        else:
+            return token.value
+
+    def process_where_clause(where_clause):
+        conditions = []
+        for token in where_clause.tokens:
+            if isinstance(token, Comparison):
+                conditions.append(process_token(token))
+        return {"$and": conditions}
+
+    def process_group_by(group_by_clause):
+        fields = []
+        for token in group_by_clause.tokens:
+            if isinstance(token, Identifier):
+                fields.append(process_token(token))
+        return {"_id": fields[0] if len(fields) == 1 else fields}
+
+    def process_having(having_clause):
+        return {"$match": process_where_clause(having_clause)}
+
+    def process_order_by(order_by_clause):
+        sort_fields = {}
+        for token in order_by_clause.tokens:
+            if isinstance(token, Identifier):
+                field = process_token(token)
+                sort_fields[field] = 1  # Default to ascending
+            elif token.ttype is Keyword and token.value.upper() in ('ASC', 'DESC'):
+                sort_fields[field] = 1 if token.value.upper() == 'ASC' else -1
+        return sort_fields
+
+    result = {}
+    pipeline = []
+    collection = None
+    for token in parsed.tokens:
+        if token.ttype is DML and token.value.upper() == 'SELECT':
+            result['operation'] = 'aggregate'
+        elif token.ttype is Keyword and token.value.upper() == 'FROM':
+            collection = process_token(parsed.token_next(token)[0])
+            result['collection'] = collection
+        elif token.ttype is Keyword and token.value.upper() == 'WHERE':
+            pipeline.append(process_token(parsed.token_next(token)[0]))
+        elif token.ttype is Keyword and token.value.upper() == 'GROUP BY':
+            group_by = process_group_by(parsed.token_next(token)[0])
+            pipeline.append({"$group": group_by})
+        elif token.ttype is Keyword and token.value.upper() == 'HAVING':
+            pipeline.append(process_having(parsed.token_next(token)[0]))
+        elif token.ttype is Keyword and token.value.upper() == 'ORDER BY':
+            result['sort'] = process_order_by(parsed.token_next(token)[0])
+        elif token.ttype is Keyword and token.value.upper() == 'LIMIT':
+            result['limit'] = int(process_token(parsed.token_next(token)[0]))
+
+    result['pipeline'] = pipeline
+    return result
+
+# Example usage
+sql_query = """
+WITH aggregation AS (
+  SELECT
+    category,
+    AVG(price) AS avg_price
+  FROM
+    products
+  GROUP BY
+    category
+  HAVING avg_price > 100
+)
+SELECT *
+FROM aggregation
+ORDER BY avg_price DESC
+LIMIT 5
+"""
+
+json_result = postgresql_to_json(sql_query)
+print(json_result)

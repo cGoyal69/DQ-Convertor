@@ -208,7 +208,7 @@ const alterTableToSql = (json) => {
 const dropTableToSql = (json) => {
   return `DROP TABLE ${json.tableName}`;
 };
-/*
+
 // Example inputs
 const exampleInsert = `{
   "collection": "products",
@@ -274,6 +274,6 @@ console.log(jsonToSql(exampleUpdate));
 console.log(jsonToSql(exampleDelete));
 console.log(jsonToSql(exampleCreateTable));
 console.log(jsonToSql(exampleDropTable));
-*/
+
 
 module.exports = jsonToSql;

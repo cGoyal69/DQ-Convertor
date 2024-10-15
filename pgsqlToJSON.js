@@ -2,19 +2,26 @@ function pgsqlToJSON(sqlQuery) {
     function parsePostgresToMongo(sqlQuery) {
         sqlQuery = sqlQuery.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
+        const withRegex = /^WITH\s+.+?\s+(SELECT|INSERT|UPDATE|DELETE)\s+(.*)$/i;
         const queryRegex = /^(SELECT|INSERT|UPDATE|DELETE)\s+(.*)$/i;
         const selectRegex = /SELECT\s+(.+?)\s+FROM\s+(\w+(?:\s+\w+)?(?:\s+AS\s+\w+)?)\s*(.*)$/i;
         const insertRegex = /INSERT INTO\s+(\w+)\s+\((.+?)\)\s+VALUES\s+\((.+?)\)/i;
         const updateRegex = /UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$/i;
         const deleteRegex = /DELETE FROM\s+(\w+)(?:\s+WHERE\s+(.+))?$/i;
 
-        const queryMatch = sqlQuery.match(queryRegex);
-        if (!queryMatch) {
+        let match = sqlQuery.match(withRegex);
+        if (match) {
+            sqlQuery = match[2]; // Get the query part after WITH
+        } else {
+            match = sqlQuery.match(queryRegex);
+        }
+        
+        if (!match) {
             console.error('Query type match failed');
             throw new Error('Invalid SQL query');
         }
 
-        const queryType = queryMatch[1].toUpperCase();
+        const queryType = match[1].toUpperCase();
         let mongoQuery = {};
         
         switch (queryType) {
@@ -280,5 +287,23 @@ function pgsqlToJSON(sqlQuery) {
     const result = parsePostgresToMongo(sqlQuery);
     return JSON.stringify(result, null, 2); // Return formatted JSON
 }
+
+const b =  `WITH aggregation AS (
+  SELECT
+    category,
+    AVG(price) AS avg_price,
+    SUM(price) AS total
+  FROM
+    products
+  GROUP BY
+    category
+  HAVING avg_price > 100
+)
+SELECT *
+FROM aggregation
+ORDER BY total DESC, avg_price DESC
+LIMIT 5`;
+
+console.log(pgsqlToJSON(b));
 
 module.exports = pgsqlToJSON;

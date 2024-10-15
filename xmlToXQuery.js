@@ -50,7 +50,7 @@ function xmlToXQuery(xmlString) {
 }
 module.exports = xmlToXQuery;
 
-
+/*
 
 const originalXml = `
 <root>
@@ -84,3 +84,4 @@ console.log("Original XML:");
 console.log(originalXml);
 
 console.log(xmlToXQuery(originalXml));
+*/
