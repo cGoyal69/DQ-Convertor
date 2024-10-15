@@ -1,52 +1,70 @@
 function jsonToMongo(Json) {
     const json = JSON.parse(Json);
-    let queryString = `db.${json.collection}.${json.operation}(`;
+    let queryString = `db.${json.collection}.`;
     const args = [];
 
-    switch (json.operation) {
-        case 'find':
-        case 'findOne':
-            args.push(json.filter || {});
-            if (json.projection) args.push(json.projection);
-            break;
-        case 'insert':
-        case 'insertOne':
-            args.push(json.documents[0]); // Only insert one document
-            break;
-        case 'insertMany':
+    // Handle insert operations
+    if (json.operation === 'insert' || json.operation === 'insertOne') {
+        if (Array.isArray(json.documents) && json.documents.length === 1) {
+            queryString += 'insertOne(';
+            args.push(json.documents[0]); // Insert one document
+        } else {
+            queryString += 'insertMany(';
             args.push(json.documents); // Insert multiple documents
-            break;
-        case 'update':
-        case 'updateOne':
-            args.push(json.filter, json.update);
-            break;
-            
-        case 'updateMany':
-            args.push(json.filter, json.update);
-            break;
-        case 'delete':
-        case 'deleteOne':
-            args.push(json.filter);
-            break;
-        case 'deleteMany':
-            args.push(json.filter);
-            break;
-        case 'aggregate':
-            args.push(json.pipeline);
-            break;
-        case 'create':
-            args.push(json.document); // For creating a single document
-            break;
-        case 'createMany':
-            args.push(json.documents); // For creating multiple documents
-            break;
-        default:
-            throw new Error(`Unsupported operation: ${json.operation}`);
+        }
+    } 
+    else if (json.operation === 'insertMany') {
+        queryString += 'insertMany(';
+        args.push(json.documents); // Insert multiple documents
+    } 
+    // Handle update operations (unchanged)
+    else if (json.operation === 'update' || json.operation === 'updateOne') {
+        queryString += 'updateMany(';
+        args.push(json.filter, json.update);
+    } 
+    else if (json.operation === 'updateMany') {
+        queryString += 'updateMany(';
+        args.push(json.filter, json.update);
+    } 
+    // Handle delete operations (unchanged)
+    else if (json.operation === 'delete' || json.operation === 'deleteOne') {
+        queryString += 'deleteMany(';
+        args.push(json.filter);
+    } 
+    else if (json.operation === 'deleteMany') {
+        queryString += 'deleteMany(';
+        args.push(json.filter);
+    } 
+    // Handle other operations
+    else {
+        switch (json.operation) {
+            case 'find':
+            case 'findOne':
+                queryString += json.operation + '(';
+                args.push(json.filter || {});
+                if (json.projection) args.push(json.projection);
+                break;
+            case 'aggregate':
+                queryString += 'aggregate(';
+                args.push(json.pipeline);
+                break;
+            case 'create':
+                queryString += 'insertOne('; // Assuming create means insert one
+                args.push(json.document);
+                break;
+            case 'createMany':
+                queryString += 'insertMany('; // Assuming createMany means insert many
+                args.push(json.documents);
+                break;
+            default:
+                throw new Error(`Unsupported operation: ${json.operation}`);
+        }
     }
 
     queryString += args.map(arg => stringifyArg(arg)).join(', ');
     queryString += ')';
 
+    // Optional chaining for limit and sort
     if (json.limit !== undefined) {
         queryString += `.limit(${json.limit})`;
     }
@@ -68,15 +86,17 @@ function stringifyArg(arg) {
         return JSON.stringify(arg);
     }
 }
-/*
-// Example input for update operation
+
+// Example usage
 const examples = [
-    `{"collection":"collection","operation":"updateMany","filter":{"city":"New York"},"update":{"$set":{"city":"San Francisco"}}}`
+    `{"operation":"insert","collection":"products","documents":[{"name":"product1","price":120,"category":"electronics"}]}`,
+    `{"collection":"collection","operation":"insert","documents":[{"city":"New York"}, {"city":"Los Angeles"}]}`,
+    `{"collection":"collection","operation":"update","filter":{"city":"New York"},"update":{"$set":{"city":"San Francisco"}}}`,
+    `{"collection":"collection","operation":"delete","filter":{"city":"San Francisco"}}`
 ];
 
-// Test each example
 examples.forEach(example => {
     console.log(jsonToMongo(example));
 });
-*/
+
 module.exports = jsonToMongo;

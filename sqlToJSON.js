@@ -23,19 +23,23 @@ const sqlToJson = (sqlQuery) => {
 
 const parseInsert = (sqlQuery) => {
   const result = { operation: 'insert' };
-  const match = sqlQuery.match(/insert\s+into\s+(\w+)\s*\((.*?)\)\s*values\s*\((.*?)\)/is);
-  
+  const match = sqlQuery.match(/insert\s+into\s+(\w+)\s*\((.*?)\)\s*values\s*((?:\((.*?)\),?\s*)+)/is);
+
   if (match) {
     result.collection = match[1];
     const columns = match[2].split(',').map(col => col.trim());
-    const values = match[3].split(',').map(val => parseValue(val.trim()));
+    const valueSets = match[3].match(/\((.*?)\)/g).map(val => parseValueSet(val));
 
-    result.documents = [{
-      ...Object.fromEntries(columns.map((col, i) => [col, values[i]]))
-    }];
+    result.documents = valueSets.map(values => 
+      Object.fromEntries(columns.map((col, i) => [col, values[i]]))
+    );
   }
 
   return result;
+};
+
+const parseValueSet = (valueSet) => {
+  return valueSet.replace(/^\(|\)$/g, '').split(',').map(val => parseValue(val.trim()));
 };
 
 const parseSelect = (sqlQuery) => {
@@ -319,7 +323,7 @@ const operatorMap = {
 };
 
 // Example input
-const a = `update collection set city = a `;
+const a = `INSERT INTO products (name, price, category) VALUES ('Product1', 120, 'electronics'), ('Product2', 80, 'clothing') `;
 console.log(sqlToJson(a));
 
 module.exports = sqlToJson;
