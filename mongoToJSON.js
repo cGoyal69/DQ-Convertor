@@ -120,6 +120,6 @@ function mongoToJson(queryString) {
   
     return JSON.stringify(result);
   }
-  const postgresQuery = `db.products.aggregate([ { $match: { avg_price: { $gt: 100 } } }, { $group: { _id: "$category", avg_price: { $avg: "$price" } } }, { $sort: { avg_price: -1 } } ], { sort: { total: -1 }, limit: 5 })`;
-  console.log((mongoToJson(postgresQuery)))
+  // const postgresQuery = `db.products.aggregate([ { $match: { avg_price: { $gt: 100 } } }, { $group: { _id: "$category", avg_price: { $avg: "$price" } } }, { $sort: { avg_price: -1 } } ], { sort: { total: -1 }, limit: 5 })`;
+  // console.log((mongoToJson(postgresQuery)))
   module.exports = mongoToJson;

@@ -268,12 +268,12 @@ const exampleDropTable = `{
 }`;
 
 // Parse and log example operations
-console.log(jsonToSql(exampleInsert));
-console.log(jsonToSql(exampleFind));
-console.log(jsonToSql(exampleUpdate));
-console.log(jsonToSql(exampleDelete));
-console.log(jsonToSql(exampleCreateTable));
-console.log(jsonToSql(exampleDropTable));
+// console.log(jsonToSql(exampleInsert));
+// console.log(jsonToSql(exampleFind));
+// console.log(jsonToSql(exampleUpdate));
+// console.log(jsonToSql(exampleDelete));
+// console.log(jsonToSql(exampleCreateTable));
+// console.log(jsonToSql(exampleDropTable));
 
 
 module.exports = jsonToSql;

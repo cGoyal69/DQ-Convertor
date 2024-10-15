@@ -288,22 +288,22 @@ function pgsqlToJSON(sqlQuery) {
     return JSON.stringify(result, null, 2); // Return formatted JSON
 }
 
-const b =  `WITH aggregation AS (
-  SELECT
-    category,
-    AVG(price) AS avg_price,
-    SUM(price) AS total
-  FROM
-    products
-  GROUP BY
-    category
-  HAVING avg_price > 100
-)
-SELECT *
-FROM aggregation
-ORDER BY total DESC, avg_price DESC
-LIMIT 5`;
+// const b =  `WITH aggregation AS (
+//   SELECT
+//     category,
+//     AVG(price) AS avg_price,
+//     SUM(price) AS total
+//   FROM
+//     products
+//   GROUP BY
+//     category
+//   HAVING avg_price > 100
+// )
+// SELECT *
+// FROM aggregation
+// ORDER BY total DESC, avg_price DESC
+// LIMIT 5`;
 
-console.log(pgsqlToJSON(b));
+// console.log(pgsqlToJSON(b));
 
 module.exports = pgsqlToJSON;

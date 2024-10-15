@@ -1,4 +1,5 @@
-function jsonToMongo(json) {
+function jsonToMongo(Json) {
+    const json = JSON.parse(Json)
     let queryString = `db.${json.collection}.${json.operation}(`;
     const args = [];
 
@@ -63,49 +64,15 @@ function stringifyArg(arg) {
         return JSON.stringify(arg);
     }
 }
-/*
+
 // Example inputs for various operations
 const examples = [
-    {
-        operation: "insertMany",
-        collection: "users",
-        documents: [{ name: "John", age: 30 }, { name: "Jane", age: 25 }]
-    },
-    {
-        operation: "find",
-        collection: "users",
-        filter: { age: { $gt: 20 } },
-        projection: { name: 1, age: 1 },
-        limit: 10,
-        sort: { age: 1 }
-    },
-    {
-        operation: "updateMany",
-        collection: "users",
-        filter: { age: { $lt: 30 } },
-        update: { $set: { status: "active" } }
-    },
-    {
-        operation: "deleteMany",
-        collection: "users",
-        filter: { age: { $lt: 20 } }
-    },
-   {
-        "collection": "products",
-        "operation": "aggregate",
-        "pipeline": [
-            { "$match": { "avg_price": { "$gt": 100 } } },
-            { "$group": { "_id": "$category", "avg_price": { "$avg": "$price" } } },
-            { "$sort": { "avg_price": -1 } }
-        ],
-        "sort": { "total": -1 },
-        "limit": 5
-    }
+   `{"operation":"find","collection":"user","projection":{"dicksize":1},"filter":{"$or":[{"gf":{"$eq":"kavyaa"}},{"lodu":{"$eq":"harsh"}}]},"group":{"_id":"$age"},"having":{"age":{"$gt":18}}}`
 ];
 
 // Test each example
 examples.forEach(example => {
     console.log(jsonToMongo(example));
 });
-*/
+
 module.exports = jsonToMongo;

@@ -1,35 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQ Convertor</title>
+    <title>SQL Converter</title>
     <style>
-        .areaWork{
-            width: 100%;
-            padding: 20px;
-            background-color: aliceblue;
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
             display: flex;
-            justify-content: space-around;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
         }
-        #inputBox, #outputBox{
-            height: 100px;
+        .navbar {
+            width: 100%;
+            background-color: #333;
+            overflow: hidden;
+            position: relative;
+            top: 0;
         }
-        #lang{
-            height:fit-content;
+        .navbar a {
+            float: left;
+            display: block;
+            color: #f2f2f2;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            font-size: 17px;
+        }
+        .navbar a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+        .container {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .dropdowns {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        select {
+            padding: 5px;
+            margin: 0 10px;
+            font-size: 16px;
+        }
+        .code-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .code-box {
+            width: 45%;
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            position: relative;
+        }
+        .code-box textarea {
+            width: 100%;
+            height: 200px;
+            border: none;
+            background-color: #f4f4f4;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            
+        }
+        .label {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background-color: #a8f0a8;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .conversion-details {
+            background-color: #a8f0a8;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-weight: bold;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="areaWork">
-        <textarea name="inputBox" id="inputBox"></textarea>
-        <select name="languages" id="lang">
-            <option value="MongoDB">MongoDB</option>
-            <option value="JQuery">PostgreSQL</option>
-            <option value="MySQL">MySQL</option>
-            <option value="XQuery">XQuery</option>
-      </select>
-        <textarea name="outputBox" id="outputBox"></textarea>
+    <div class="navbar">
+        <a href="#home">Home</a>
+        <a href="#services">Services</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
     </div>
+    <div class="container">
+        <div class="dropdowns">
+            <label for="inputlanglbl">Input Language:
+            <select name="inputLanguage" id="lang">
+                <option value="MongoDB">MongoDB</option>
+                <option value="JQuery">PostgreSQL</option>
+                <option value="SQL">MySQL</option>
+                <option value="XQuery">XQuery</option>
+            </select>
+            </label>
+            <span>To</span>
+            <label for="outputLanglbl">
+            <select name="outputLanguage" id="langout">
+                <option value="MongoDB">MongoDB</option>
+                <option value="JQuery">PostgreSQL</option>
+                <option value="SQL">MySQL</option>
+                <option value="XQuery">XQuery</option>
+            </select>
+            </label>
+        </div>
+        <div class="code-container">
+            <div class="code-box">
+                <div class="label">Source</div>
+                <label for="source">
+                    <textarea name="inputbox" id="inputbox">
+                    </textarea>
+                </label>
+            </div>
+            <div class="code-box">
+                <div class="label">Result</div>
+                    <textarea name="outputbox" id="outputbox">
+                    </textarea>
+            </div>
+        </div>
+        <input class="conversion-details" type="button" value="Convert" id="ansButton"/>
+        
+    </div>
+    
+    <script src="detectQueryLang.js"></script>
+    <script src="sqlToJSON.js"></script>
+    <script src="pgsqlToJSON.js"></script>
+    <script src="xmlToJson.js"></script>
+    <script src="mongoToJSON.js"></script>
+    <script src="jsonToXML.js"></script>
+    <script src="jsonToMongo.js"></script>
+    <script src="jsonToSQL.js"></script>
+    <script src="xqueryToXML.js"></script>
+    <script src="xqueryToXML.js"></script>
+    <script>
+        let c = document.getElementById("ansButton");
+        c.addEventListener("click", () => {
+        let a = document.getElementById("inputbox");
+        let b = document.getElementById("inputLang");
+        let textinput = a.value;
+        let output = detectQueryLang(textinput);
+        document.getElementById("lang").value = output;
+        let toLanguage = document.getElementById("langout").value;
+        let jsonfile = '';
+        if (output == 'XQuery'){
+            textinput = xqueryToXml(textinput);
+            jsonfile = convertXmlToJson(textinput);
+        }
+        else if (output == 'SQL')
+        {
+            jsonfile = sqlToJson(textinput);
+        }
+        else if (output == 'MongoDB')
+        {
+            jsonfile = mongoToJson(textinput);
+        }
+        else{
+            jsonfile = pgsqlToJSON(textinput);
+        }
+        let outputAns = '';
+        //console.log("Kavya Gf Chirag");
+        console.log(jsonfile)
+        if (toLanguage == 'XQuery'){
+            outputAns = convertJsonToXml(jsonfile)
+            outputAns = xmlToXQuery(outputAns);
+        }
+        else if (toLanguage == 'SQL')
+        {
+            outputAns = jsonToSql(jsonfile);
+        }
+        else if (toLanguage == 'MongoDB')
+        {
+            outputAns = jsonToMongo(jsonfile);
+        }
+        else{
+            outputAns = jsonToPGSQL(jsonfile);
+        }
+        console.log(outputAns)
+        document.getElementById("outputbox").value = outputAns;
+        });
+        
+
+    </script>
 </body>
 </html>
