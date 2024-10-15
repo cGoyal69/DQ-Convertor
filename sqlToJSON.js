@@ -319,7 +319,7 @@ const operatorMap = {
 };
 
 // Example input
-const a = `select * from users where a = b `;
+const a = `update collection set city = a `;
 console.log(sqlToJson(a));
 
 module.exports = sqlToJson;

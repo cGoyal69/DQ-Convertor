@@ -9,18 +9,22 @@ function jsonToMongo(Json) {
             args.push(json.filter || {});
             if (json.projection) args.push(json.projection);
             break;
+        case 'insert':
         case 'insertOne':
             args.push(json.documents[0]); // Only insert one document
             break;
         case 'insertMany':
             args.push(json.documents); // Insert multiple documents
             break;
+        case 'update':
         case 'updateOne':
             args.push(json.filter, json.update);
             break;
+            
         case 'updateMany':
             args.push(json.filter, json.update);
             break;
+        case 'delete':
         case 'deleteOne':
             args.push(json.filter);
             break;
@@ -65,9 +69,9 @@ function stringifyArg(arg) {
     }
 }
 
-// Example input for aggregation
+// Example input for update operation
 const examples = [
-    `{"operation":"find","collection":"users","projection":{},"filter":{"a":{"$eq":"b"}}}`
+    `{"collection":"collection","operation":"updateMany","filter":{"city":"New York"},"update":{"$set":{"city":"San Francisco"}}}`
 ];
 
 // Test each example
