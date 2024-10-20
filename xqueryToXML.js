@@ -1,4 +1,4 @@
-// File: xqueryToXml.js
+
 
 function xqueryToXml(xquery) {
   const lines = xquery.split('\n').filter(line => line.trim().startsWith('let $'));
@@ -16,7 +16,6 @@ function xqueryToXml(xquery) {
     const { elementName, content } = variables[varName];
     let xml = `<${elementName}`;
     
-    // Handle attributes
     const attrMatches = content.match(/attribute (\w+) { "([^"]*)" }/g) || [];
     attrMatches.forEach(attrMatch => {
       const [_, name, value] = attrMatch.match(/attribute (\w+) { "([^"]*)" }/);
@@ -25,14 +24,13 @@ function xqueryToXml(xquery) {
 
     xml += '>';
 
-    // Handle child elements and text content
     const childContent = content.replace(/attribute \w+ { "[^"]*" },?\s*/g, '').trim();
     if (childContent.startsWith('"') && childContent.endsWith('"')) {
-      xml += childContent.slice(1, -1); // Remove quotes for text content
+      xml += childContent.slice(1, -1); 
     } else {
       const childVarMatches = childContent.match(/\$\w+/g) || [];
       childVarMatches.forEach(childVar => {
-        xml += buildXml(childVar.slice(1)); // Remove $ from variable name
+        xml += buildXml(childVar.slice(1)); 
       });
     }
 

@@ -56,10 +56,8 @@ function detectQueryLang(query) {
         }
     };
 
-    // Initialize scores for each language
     const scores = Object.keys({...generalPatterns, ...definitiveMarkers}).reduce((acc, key) => ({...acc, [key]: 0}), {});
 
-    // Check for definitive markers first
     for (const [language, marker] of Object.entries(definitiveMarkers)) {
         for (const pattern of marker.patterns) {
             if (pattern.test(query)) {
@@ -68,7 +66,6 @@ function detectQueryLang(query) {
         }
     }
 
-    // If no definitive markers found, proceed with general detection
     if (Object.values(scores).every(score => score === 0)) {
         for (const [language, pattern] of Object.entries(generalPatterns)) {
             const keywordMatches = ((language === 'jQuery' ? query.toLowerCase() : query.toUpperCase()).match(pattern.keywords) || []).length;
@@ -90,7 +87,6 @@ function detectQueryLang(query) {
         }
     }
 
-    // Find the language with the highest score
     let detectedLanguage = Object.entries(scores).reduce((max, [lang, score]) => 
         score > max[1] ? [lang, score] : max, ['Unknown', 0]);
 

@@ -1,4 +1,4 @@
-// File: xmlToXquery.js
+
 const { DOMParser } = require('xmldom');
 
 function xmlToXQuery(xmlString) {

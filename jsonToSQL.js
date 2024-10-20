@@ -1,5 +1,3 @@
-// JSON to SQL Converter
-
 const jsonToSql = (json) => {
   json = JSON.parse(json);
   switch (json.operation) {
@@ -18,6 +16,7 @@ const jsonToSql = (json) => {
     case 'deleteMany':
       return deleteToSql(json);
     case 'createTable':
+    case 'createCollection':
       return createTableToSql(json);
     case 'alterTable':
       return alterTableToSql(json);
@@ -30,40 +29,59 @@ const jsonToSql = (json) => {
   }
 };
 
-const aggregateToSql = (json) => {
-  const { collection, pipeline } = json;
-  let sql = `SELECT `;
+const createTableToSql = (json) => {
+  const { collection, schema, foreignKeys, options } = json;
 
-  const groupBy = pipeline.find(stage => stage.$group);
-  if (groupBy) {
-    const groupFields = Object.keys(groupBy.$group).map(field => {
-      return `${field === '_id' ? field : `AVG(${field}) AS ${field}`}`;
+  // Extract columns and types from the schema
+  const columns = Object.entries(schema).map(([field, details]) => {
+    return `${field} ${typeToSql(details.type)}${details.unique ? ' UNIQUE' : ''}${details.required ? ' NOT NULL' : ''}`;
+  }).join(', ');
+
+  let sql = `CREATE TABLE ${collection} (${columns}`;
+
+  // Add foreign keys if they exist
+  if (foreignKeys && foreignKeys.length > 0) {
+    const foreignKeyClauses = foreignKeys.map(fk => {
+      return `FOREIGN KEY (${fk.column}) REFERENCES ${fk.reference.table}(${fk.reference.column})`;
     }).join(', ');
 
-    sql += `${groupFields} FROM ${collection} `;
-
-    const matchStage = pipeline.find(stage => stage.$match);
-    if (matchStage) {
-      sql += `WHERE ${filterToSql(matchStage.$match)} `;
-    }
-
-    sql += `GROUP BY ${groupBy.$group._id}`;
-  } else {
-    sql += `* FROM ${collection} `;
+    sql += `, ${foreignKeyClauses}`;
   }
 
-  const sortStage = pipeline.find(stage => stage.$sort);
-  if (sortStage) {
-    sql += ` ORDER BY ${sortToSql(sortStage.$sort)}`;
-  }
+  sql += ')';
 
-  const limitStage = pipeline.find(stage => stage.$limit);
-  if (limitStage) {
-    sql += ` LIMIT ${limitStage.$limit}`;
+  // Add primary key if provided in options
+  if (options && options.primaryKey) {
+    sql += `, PRIMARY KEY(${options.primaryKey})`;
   }
 
   return sql.trim();
 };
+
+const typeToSql = (type) => {
+  switch (type.toLowerCase()) {
+    case 'string':
+      return 'VARCHAR(255)';
+    case 'number':
+      return 'INTEGER';
+    case 'boolean':
+      return 'BOOLEAN';
+    case 'date':
+      return 'DATE';
+    case 'mixed': // Handle "Mixed" type
+      return 'TEXT'; // or 'JSON' if your database supports JSON data type
+    default:
+      throw new Error(`Unsupported type: ${type}`);
+  }
+};
+
+// Helper for sort logic
+const sortToSql = (sort) => {
+  return Object.entries(sort).map(([field, direction]) => {
+    return `${field} ${direction === 1 ? 'ASC' : 'DESC'}`;
+  }).join(', ');
+};
+
 
 const insertToSql = (json) => {
   const { collection, documents } = json;
@@ -78,65 +96,223 @@ const insertToSql = (json) => {
   return `INSERT INTO ${collection} (${columns.join(', ')}) VALUES ${values}`;
 };
 
-const findToSql = (json) => {
-  const { collection, projection, filter, sort, limit, skip } = json;
-  const fields = Object.keys(projection || {}).length > 0 ? Object.keys(projection).join(', ') : '*';
-  let sql = `SELECT ${fields} FROM ${collection}`;
+
+
+const deleteToSql = (json) => {
+  const { collection, filter } = json;
+  let sql = `DELETE FROM ${collection} `;
 
   if (filter) {
-    sql += ` WHERE ${filterToSql(filter)}`;
+    sql += `WHERE ${filterToSql(filter)} `;
+  }
+
+  return sql.trim();
+};
+
+
+const alterTableToSql = (json) => {
+  const { collection, fields } = json;
+  const columns = Object.entries(fields).map(([field, type]) => {
+    return `ADD COLUMN ${field} ${typeToSql(type)}`;
+  }).join(', ');
+
+  return `ALTER TABLE ${collection} ${columns}`;
+};
+
+const dropTableToSql = (json) => {
+  const { collection } = json;
+  return `DROP TABLE ${collection}`;
+};
+
+
+
+
+
+const aggregateToSql = (json) => {
+  const { collection, pipeline } = json;
+  let sql = `SELECT `;
+
+  const projectStage = pipeline.find(stage => stage.$project);
+  const groupStage = pipeline.find(stage => stage.$group);
+
+  if (groupStage) {
+    const groupFields = Object.entries(groupStage.$group).map(([field, value]) => {
+      if (field === '_id') {
+        if (typeof value === 'object') {
+          return Object.entries(value).map(([key, val]) => 
+            `${val.substring(1)} AS ${key}`
+          ).join(', ');
+        }
+        return value.substring(1);
+      } else {
+        return aggregationToSql(field, value);
+      }
+    }).join(', ');
+
+    sql += groupFields;
+  } else if (projectStage) {
+    const fields = Object.keys(projectStage.$project)
+      .filter(key => projectStage.$project[key] !== 0)
+      .map(field => field)
+      .join(', ');
+    sql += fields;
+  } else {
+    sql += '*';
+  }
+
+  sql += ` FROM ${collection} `;
+
+  const matchStage = pipeline.find(stage => stage.$match);
+  if (matchStage) {
+    sql += `WHERE ${filterToSql(matchStage.$match)} `;
+  }
+
+  if (groupStage) {
+    const groupByFields = Object.values(groupStage.$group._id).map(f => f.substring(1)).join(', ');
+    sql += `GROUP BY ${groupByFields} `;
+  }
+
+  const sortStage = pipeline.find(stage => stage.$sort);
+  if (sortStage) {
+    sql += ` ORDER BY ${sortToSql(sortStage.$sort)}`;
+  }
+
+  const limitStage = pipeline.find(stage => stage.$limit);
+  if (limitStage) {
+    sql += ` LIMIT ${limitStage.$limit}`;
+  }
+
+  const skipStage = pipeline.find(stage => stage.$skip);
+  if (skipStage) {
+    sql += ` OFFSET ${skipStage.$skip}`;
+  }
+
+  return sql.trim();
+};
+
+const aggregationToSql = (field, value) => {
+  if (value.$sum) {
+    return `SUM(${value.$sum.substring(1)}) AS ${field}`;
+  } else if (value.$avg) {
+    return `AVG(${value.$avg.substring(1)}) AS ${field}`;
+  } else if (value.$min) {
+    return `MIN(${value.$min.substring(1)}) AS ${field}`;
+  } else if (value.$max) {
+    return `MAX(${value.$max.substring(1)}) AS ${field}`;
+  } else if (value.$count) {
+    return `COUNT(${value.$count.substring(1)}) AS ${field}`;
+  } else if (value.$first) {
+    return `MIN(${value.$first.substring(1)}) AS ${field}`; // Approximation in SQL
+  } else if (value.$last) {
+    return `MAX(${value.$last.substring(1)}) AS ${field}`; // Approximation in SQL
+  } else if (value.$push) {
+    return `GROUP_CONCAT(${value.$push.substring(1)}) AS ${field}`; // MySQL-specific, adjust for other databases
+  } else if (value.$addToSet) {
+    return `GROUP_CONCAT(DISTINCT ${value.$addToSet.substring(1)}) AS ${field}`; // MySQL-specific, adjust for other databases
+  } else if (value.$stdDevPop) {
+    return `STDDEV_POP(${value.$stdDevPop.substring(1)}) AS ${field}`;
+  } else if (value.$stdDevSamp) {
+    return `STDDEV_SAMP(${value.$stdDevSamp.substring(1)}) AS ${field}`;
+  }
+  // Add more aggregation functions as needed
+  throw new Error(`Unsupported aggregation operation: ${Object.keys(value)[0]}`);
+};
+
+
+const updateToSql = (json) => {
+  const { collection, filter, update } = json;
+  let sql = `UPDATE ${collection} SET `;
+
+  const updates = Object.entries(update.$set).map(([field, value]) => {
+    if (field === '_id') {
+      throw new Error('Cannot update _id field');
+    }
+    return `${field} = ${formatValue(value)}`;
+  }).join(', ');
+
+  sql += `${updates} `;
+
+  if (filter) {
+    sql += `WHERE ${handleNestedQuery(filter)}`;
+  }
+
+  return sql.trim();
+};
+
+const findToSql = (json) => {
+  const { collection, projection, filter, sort, limit, skip } = json;
+  const fields = Object.keys(projection || {}).length > 0 ? Object.keys(projection).map(field => {
+    return field === '_id' ? field : `${field} AS ${field}`;
+  }).join(', ') : '*';
+
+  let sql = `SELECT ${fields} FROM ${collection} `;
+
+  if (filter) {
+    sql += `WHERE ${filterToSql(filter)} `;
   }
 
   if (sort) {
-    sql += ` ORDER BY ${sortToSql(sort)}`;
+    sql += `ORDER BY ${sortToSql(sort)} `;
   }
 
   if (limit) {
-    sql += ` LIMIT ${limit}`;
+    sql += `LIMIT ${limit} `;
   }
 
   if (skip) {
-    sql += ` OFFSET ${skip}`;
+    sql += `OFFSET ${skip} `;
   }
 
-  return sql;
+  return sql.trim();
+};
+
+const handleNestedQuery = (filter) => {
+  if (typeof filter !== 'object' || filter === null) return filterToSql(filter);
+
+  const conditions = [];
+  for (const [key, value] of Object.entries(filter)) {
+    if (key === '$and') {
+      conditions.push(`(${value.map(handleNestedQuery).join(' AND ')})`);
+    } else if (typeof value === 'object' && value !== null) {
+      if (value.$in && Array.isArray(value.$in) && value.$in[0].operation === 'find') {
+        // Construct the nested subquery correctly using findToSql
+        const nestedSql = findToSql(value.$in[0]);
+        conditions.push(`${key} IN (${nestedSql})`);
+      } else {
+        conditions.push(filterToSql({ [key]: value }));
+      }
+    } else {
+      conditions.push(`${key} = ${formatValue(value)}`);
+    }
+  }
+  return conditions.join(' AND ');
 };
 
 const filterToSql = (filter) => {
-  if (Array.isArray(filter.$and)) {
-    return filter.$and.map(subFilter => `(${filterToSql(subFilter)})`).join(' AND ');
-  }
-
-  if (Array.isArray(filter.$or)) {
-    return filter.$or.map(subFilter => `(${filterToSql(subFilter)})`).join(' OR ');
-  }
-
-  if (Array.isArray(filter.$not)) {
-    return `NOT (${filterToSql(filter.$not[0])})`;
-  }
-
   return Object.entries(filter).map(([field, condition]) => {
     if (typeof condition === 'object') {
-      const [operator, value] = Object.entries(condition)[0];
-      switch (operator) {
-        case '$eq':
-          return `${field} = ${formatValue(value)}`;
-        case '$ne':
-          return `${field} != ${formatValue(value)}`;
-        case '$gt':
-          return `${field} > ${formatValue(value)}`;
-        case '$lt':
-          return `${field} < ${formatValue(value)}`;
-        case '$gte':
-          return `${field} >= ${formatValue(value)}`;
-        case '$lte':
-          return `${field} <= ${formatValue(value)}`;
-        case '$in':
-          return `${field} IN (${value.map(formatValue).join(', ')})`;
-        case '$regex':
-          return `${field} LIKE ${formatValue(value.replace(/^\^|\$$/g, '%'))}`;
-        default:
-          throw new Error(`Unsupported operator: ${operator}`);
+      if (condition.$eq) {
+        return `${field} = ${formatValue(condition.$eq)}`;
+      } else if (condition.$ne) {
+        return `${field} != ${formatValue(condition.$ne)}`;
+      } else if (condition.$gt) {
+        return `${field} > ${formatValue(condition.$gt)}`;
+      } else if (condition.$lt) {
+        return `${field} < ${formatValue(condition.$lt)}`;
+      } else if (condition.$gte) {
+        return `${field} >= ${formatValue(condition.$gte)}`;
+      } else if (condition.$lte) {
+        return `${field} <= ${formatValue(condition.$lte)}`;
+      } else if (condition.$in) {
+        return `${field} IN (${condition.$in.map(formatValue).join(', ')})`;
+      } else if (condition.$nin) {
+        return `${field} NOT IN (${condition.$nin.map(formatValue).join(', ')})`;
+      } else if (condition.$regex) {
+        return `${field} REGEXP ${formatValue(condition.$regex)}`;
+      } else if (condition.$exists) {
+        return `${field} IS ${condition.$exists ? 'NOT NULL' : 'NULL'}`;
+      } else if (condition.$type) {
+        return `${field} IS ${typeToSql(condition.$type)}`;
       }
     } else {
       return `${field} = ${formatValue(condition)}`;
@@ -144,171 +320,64 @@ const filterToSql = (filter) => {
   }).join(' AND ');
 };
 
-const sortToSql = (sort) => {
-  return Object.entries(sort).map(([field, direction]) => `${field} ${direction === 1 ? 'ASC' : 'DESC'}`).join(', ');
-};
+
+
 
 const formatValue = (value) => {
   if (typeof value === 'string') {
-    return `'${value.replace(/'/g, "''")}'`;
-  }
-  if (value instanceof Date) {
-    return `'${value.toISOString()}'`;
-  }
-  if (value === null) {
+    return `'${value}' `;
+  } else if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  } else if (value === null) {
     return 'NULL';
+  } else if (Array.isArray(value)) {
+    return `(${value.map(formatValue).join(', ')})`;
+  } else if (typeof value === 'object') {
+    return `'${JSON.stringify(value)}'`;
   }
-  return value;
+  throw new Error(`Unsupported value type: ${typeof value}`);
 };
 
-const updateToSql = (json) => {
-  const { collection, update, filter } = json;
-  if (!update || !update.$set) {
-    throw new Error('Invalid update operation structure');
-  }
-  const setClause = Object.entries(update.$set).map(([field, value]) => `${field} = ${formatValue(value)}`).join(', ');
-  let sql = `UPDATE ${collection} SET ${setClause}`;
 
-  if (filter) {
-    sql += ` WHERE ${filterToSql(filter)}`;
-  }
-
-  return sql;
-};
-
-const deleteToSql = (json) => {
-  const { collection, filter } = json;
-  let sql = `DELETE FROM ${collection}`;
-
-  if (filter) {
-    sql += ` WHERE ${filterToSql(filter)}`;
-  }
-
-  return sql;
-};
-
-const createTableToSql = (json) => {
-  const { tableName, columns } = json;
-  const columnDefinitions = columns.map(column => {
-    let def = `${column.name} ${column.type.toUpperCase()}`;
-    if (column.constraints) {
-      def += ` ${column.constraints.join(' ')}`;
-    }
-    return def;
-  }).join(', ');
-
-  return `CREATE TABLE ${tableName} (${columnDefinitions})`;
-};
-
-const alterTableToSql = (json) => {
-  const { tableName, alterations } = json;
-  const alterClauses = alterations.map(alteration => {
-    switch (alteration.type) {
-      case 'addColumn':
-        return `ADD COLUMN ${alteration.name} ${alteration.dataType.toUpperCase()} ${alteration.constraints.join(' ')}`;
-      case 'dropColumn':
-        return `DROP COLUMN ${alteration.name}`;
-      case 'modifyColumn':
-        return `MODIFY COLUMN ${alteration.name} ${alteration.newDataType.toUpperCase()} ${alteration.newConstraints.join(' ')}`;
-      default:
-        throw new Error(`Unsupported alteration type: ${alteration.type}`);
-    }
-  });
-
-  return `ALTER TABLE ${tableName} ${alterClauses.join(', ')}`;
-};
-
-const dropTableToSql = (json) => {
-  return `DROP TABLE ${json.tableName}`;
-};
-
-// Example Operations
-const exampleAggregate = `{
-  "collection": "products",
-  "operation": "aggregate",
-  "pipeline": [
-    {
-      "$match": {
-        "price": {
-          "$gt": 100
-        }
-      }
-    },
-    {
-      "$group": {
-        "_id": "$category",
-        "avg_price": {
-          "$avg": "$price"
-        },
-        "total_count": {
-          "$sum": 1
-        }
-      }
-    },
-    {
-      "$sort": {
-        "avg_price": -1
-      }
-    },
-    {
-      "$limit": 5
-    }
-  ]
-}`;
-
-const exampleInsert = `{
-  "collection": "products",
-  "operation": "insertMany",
-  "documents": [
-    {"name": "Product1", "price": 120, "category": "electronics"},
-    {"name": "Product2", "price": 80, "category": "clothing"}
-  ]
-}`;
-
-const exampleFind = `{
-  "collection": "products",
-  "operation": "find",
-  "filter": {"category": "electronics"},
-  "projection": {"name": 1, "price": 1},
-  "sort": {"price": -1},
-  "limit": 10
-}`;
-
-const exampleUpdate = `{
-  "operation": "update",
-  "collection": "products",
-  "update": {"$set": {"avg_price": 150}},
-  "filter": {"avg_price": {"$gt": 100}}
-}`;
-
-const exampleDelete = `{
-  "operation": "delete",
-  "collection": "users",
-  "filter": {"age": {"$lt": 20}}
-}`;
-
-const exampleCreateTable = `{
+const exampleNestedAggregate = `{
   "operation": "createTable",
   "tableName": "users",
   "columns": [
-    {"name": "id", "type": "int", "constraints": ["PRIMARY KEY", "AUTO_INCREMENT"]},
-    {"name": "name", "type": "varchar(100)", "constraints": []},
-    {"name": "age", "type": "int", "constraints": []}
+    {
+      "name": "CREATE",
+      "type": "VARCHAR(255)",
+      "constraints": []
+    },
+    {
+      "name": "id",
+      "type": "INTEGER",
+      "constraints": []
+    },
+    {
+      "name": "username",
+      "type": "VARCHAR(255)",
+      "constraints": [
+        "NOT NULL"
+      ]
+    },
+    {
+      "name": "email",
+      "type": "VARCHAR(255)",
+      "constraints": [
+        "NOT NULL"
+      ]
+    },
+    {
+      "name": "age",
+      "type": "INTEGER",
+      "constraints": []
+    },
+    {
+      "name": "created_at",
+      "type": "VARCHAR(255)",
+      "constraints": []
+    }
   ]
 }`;
 
-const exampleDropTable = `{
-  "operation": "dropTable",
-  "tableName": "users"
-}`;
-
-// Test the functions
-console.log(jsonToSql(exampleAggregate));
-console.log(jsonToSql(exampleInsert));
-console.log(jsonToSql(exampleFind));
-console.log(jsonToSql(exampleUpdate));
-console.log(jsonToSql(exampleDelete));
-console.log(jsonToSql(exampleCreateTable));
-console.log(jsonToSql(exampleDropTable));
-
-module.exports = jsonToSql;
+console.log(jsonToSql(exampleNestedAggregate));

@@ -78,7 +78,7 @@
             background-color: #f4f4f4;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
-            
+            text-align: left;
         }
         .label {
             position: absolute;
@@ -101,21 +101,10 @@
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="#home">Home</a>
-        <a href="#services">Services</a>
-        <a href="#about">About</a>
-        <a href="#contact">Contact</a>
-    </div>
     <div class="container">
         <div class="dropdowns">
             <label for="inputlanglbl">Input Language:
-            <select name="inputLanguage" id="lang">
-                <option value="MongoDB">MongoDB</option>
-                <option value="JQuery">PostgreSQL</option>
-                <option value="SQL">MySQL</option>
-                <option value="XQuery">XQuery</option>
-            </select>
+            <input type="text" name="inputLanguage"  value="   " readonly="readonly" id = "lang" style="width: 90px; height: 25px; margin-right: 10px;"/>
             </label>
             <span>To</span>
             <label for="outputLanglbl">
@@ -131,8 +120,7 @@
             <div class="code-box">
                 <div class="label">Source</div>
                 <label for="source">
-                    <textarea name="inputbox" id="inputbox">
-                    </textarea>
+                    <textarea name="inputbox" id="inputbox"></textarea>
                 </label>
             </div>
             <div class="code-box">
@@ -144,24 +132,22 @@
         <input class="conversion-details" type="button" value="Convert" id="ansButton"/>
         
     </div>
-    
-    <script src="detectQueryLang.js"></script>
-    <script src="sqlToJSON.js"></script>
-    <script src="pgsqlToJSON.js"></script>
     <script src="xmlToJson.js"></script>
-    <script src="mongoToJSON.js"></script>
-    <script src="jsonToXML.js"></script>
-    <script src="jsonToMongo.js"></script>
-    <script src="jsonToSQL.js"></script>
-    <script src="xqueryToXML.js"></script>
-    <script src="xqueryToXML.js"></script>
-    <script>
+<script src="detectQueryLang.js"></script>
+<script src="sqlToJSON.js"></script>
+<script src="pgsqlToJSON.js"></script>
+<script src="mongoToJSON.js"></script>
+<script src="jsonToXML.js"></script>
+<script src="jsonToMongo.js"></script>
+<script src="jsonToSQL.js"></script>
+<script src="xqueryToXML.js"></script>
+<script>
         let c = document.getElementById("ansButton");
         c.addEventListener("click", () => {
         let a = document.getElementById("inputbox");
-        let b = document.getElementById("inputLang");
         let textinput = a.value;
         let output = detectQueryLang(textinput);
+        
         document.getElementById("lang").value = output;
         let toLanguage = document.getElementById("langout").value;
         let jsonfile = '';
@@ -181,22 +167,21 @@
             jsonfile = pgsqlToJSON(textinput);
         }
         let outputAns = '';
-        //console.log("Kavya Gf Chirag");
         console.log(jsonfile)
-        if (toLanguage == 'XQuery'){
-            outputAns = convertJsonToXml(jsonfile)
-            outputAns = xmlToXQuery(outputAns);
-        }
-        else if (toLanguage == 'SQL')
+        if (toLanguage == 'SQL')
         {
             outputAns = jsonToSql(jsonfile);
+        }
+        else if (toLanguage == 'XQuery'){
+            outputAns1 = convertJsonToXml(jsonfile)
+            outputAns = xmlToXQuery(outputAns1)
         }
         else if (toLanguage == 'MongoDB')
         {
             outputAns = jsonToMongo(jsonfile);
         }
         else{
-            outputAns = jsonToPGSQL(jsonfile);
+            outputAns = createMongoToPGConverter(jsonfile);
         }
         console.log(outputAns)
         document.getElementById("outputbox").value = outputAns;

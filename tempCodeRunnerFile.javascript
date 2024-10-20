@@ -274,9 +274,9 @@ const handleDelete = (query) => {
     return result;
 };
 
-const handleCreateTable = (sqlCreateTable) => {
+const handleCreateTable = (sqlCommand) => {
     // Extract table name
-    const tableNameMatch = sqlCreateTable.match(/CREATE TABLE (\w+)/i);
+    const tableNameMatch = sqlCommand.match(/CREATE TABLE (\w+)/i);
     const tableName = tableNameMatch ? tableNameMatch[1] : null;
 
     if (!tableName) {
@@ -285,12 +285,13 @@ const handleCreateTable = (sqlCreateTable) => {
 
     // Extract column definitions
     const columnRegex = /(\w+)\s+(\w+(?:\(\d+\))?)\s*([^,\n]+)?/g;
-    const columns = [...sqlCreateTable.matchAll(columnRegex)];
+    const columns = [...sqlCommand.matchAll(columnRegex)];
 
-    const intermediateJson = {
+    const result = {
         operation: "createTable",
         tableName: tableName,
-        columns: []
+        schema: {},
+        options: {}
     };
 
     let hasPrimaryKey = false;
@@ -298,41 +299,57 @@ const handleCreateTable = (sqlCreateTable) => {
     columns.forEach(column => {
         const [, name, dataType, constraintsStr] = column;
         const columnDef = {
-            name: name,
-            type: dataType.toUpperCase(),
-            constraints: []
+            type: mapSqlTypeToMongoType(dataType.toUpperCase()),
         };
 
         if (constraintsStr) {
             if (/NOT NULL/i.test(constraintsStr)) {
-                columnDef.constraints.push("NOT NULL");
+                columnDef.required = true;
             }
             if (/UNIQUE/i.test(constraintsStr)) {
-                columnDef.constraints.push("UNIQUE");
+                columnDef.unique = true;
             }
             if (/PRIMARY KEY/i.test(constraintsStr)) {
                 if (hasPrimaryKey) {
                     throw new Error("Multiple primary keys are not supported");
                 }
                 hasPrimaryKey = true;
-                columnDef.constraints.push("PRIMARY KEY");
+                columnDef.unique = true;
+                result.options.primaryKey = name;
             }
-            // Add checks for other constraints here
+            // Handle default values
+            const defaultMatch = constraintsStr.match(/DEFAULT\s+(.+)/i);
+            if (defaultMatch) {
+                columnDef.default = parseValue(defaultMatch[1].trim());
+            }
         }
 
-        intermediateJson.columns.push(columnDef);
+        result.schema[name] = columnDef;
     });
 
     // Add _id field if no primary key was specified
     if (!hasPrimaryKey) {
-        intermediateJson.columns.unshift({
-            name: "_id",
-            type: "VARCHAR(24)",
-            constraints: ["NOT NULL", "PRIMARY KEY"]
-        });
+        result.schema._id = { type: 'ObjectId', required: true };
+        result.options.primaryKey = '_id';
     }
 
-    return intermediateJson;
+    if (sqlCommand.toLowerCase().includes('auto_increment')) {
+        result.options.autoIndexId = true;
+    }
+
+    return result;
+};
+
+// Helper function to map SQL types to MongoDB types
+const mapSqlTypeToMongoType = (sqlType) => {
+    const typeMap = {
+        'INT': 'Number', 'INTEGER': 'Number', 'BIGINT': 'Number', 'FLOAT': 'Number',
+        'DOUBLE': 'Number', 'DECIMAL': 'Decimal128', 'NUMERIC': 'Decimal128',
+        'CHAR': 'String', 'VARCHAR': 'String', 'TEXT': 'String', 'DATE': 'Date',
+        'DATETIME': 'Date', 'TIMESTAMP': 'Date', 'BOOLEAN': 'Boolean', 'BLOB': 'Buffer'
+    };
+
+    return typeMap[sqlType] || 'Mixed';
 };
 
 const hasSubquery = (query) => {
