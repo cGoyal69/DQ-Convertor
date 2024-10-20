@@ -224,7 +224,7 @@ function parseArguments(argsString) {
   });
 }
 
-module.exports = mongoToJson;
+//module.exports = mongoToJson;
 
 console.log(mongoToJson(`db.users.updateMany({ order_id: { $in: [ { operation: "find", collection: "order_items", projection: { order_id: 1 }, filter: { $and: [ { product_id: { $eq: 123 } }, { name: { $in: [ "Kavyaa", "Lakshita", "'Cou" ] } } ] } } ] } }, { $set: { age: 31, a: "b" } })`));
 console.log(mongoToJson(`db.createCollection("employees", {

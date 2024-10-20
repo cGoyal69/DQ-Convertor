@@ -92,7 +92,7 @@ function detectQueryLang(query) {
 
     return detectedLanguage[0];
 }
-module.exports = detectQueryLang;
+//module.exports = detectQueryLang;
 
 /*
 // Test queries with expected results

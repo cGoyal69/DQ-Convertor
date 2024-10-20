@@ -1,5 +1,5 @@
 
-const { DOMParser } = require('xmldom');
+//import { DOMParser } from 'xmldom';
 
 function xmlToXQuery(xmlString) {
   const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
@@ -48,7 +48,7 @@ function xmlToXQuery(xmlString) {
 
   return xquery.trim();
 }
-module.exports = xmlToXQuery;
+//export default xmlToXQuery;
 
 /*
 

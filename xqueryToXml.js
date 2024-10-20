@@ -40,7 +40,7 @@ function xqueryToXml(xquery) {
 
   return buildXml('root');
 }
-module.exports = xqueryToXml;
+//module.exports = xqueryToXml;
 /*
 console.log(xqueryToXml(`xquery version "3.1";
         let $root := element root { $root_collection, $root_operation, $root_pipeline, $root_sort, $root_limit }

@@ -110,7 +110,7 @@
             <label for="outputLanglbl">
             <select name="outputLanguage" id="langout">
                 <option value="MongoDB">MongoDB</option>
-                <option value="JQuery">PostgreSQL</option>
+                <option value="XML">XML</option>
                 <option value="SQL">MySQL</option>
                 <option value="XQuery">XQuery</option>
             </select>
@@ -132,28 +132,28 @@
         <input class="conversion-details" type="button" value="Convert" id="ansButton"/>
         
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/xmldom@0.6.0/lib/entities.min.js"></script>
+    <script src="detectQueryLang.js"></script>
+    <script src="mongoToJson.js"></script>
+    <script src="jsonToMongo.js"></script>
+    <script src="sqlToJson.js"></script>
+    <script src="jsonToSql.js"></script>
     <script src="xmlToJson.js"></script>
-<script src="detectQueryLang.js"></script>
-<script src="sqlToJSON.js"></script>
-<script src="pgsqlToJSON.js"></script>
-<script src="mongoToJSON.js"></script>
-<script src="jsonToXML.js"></script>
-<script src="jsonToMongo.js"></script>
-<script src="jsonToSQL.js"></script>
-<script src="xqueryToXML.js"></script>
+    <script src="jsonToXml.js"></script>    
+    <script src="xqueryToXml.js"></script>
+    <script src="xmlToXQuery.js"></script>
 <script>
         let c = document.getElementById("ansButton");
         c.addEventListener("click", () => {
         let a = document.getElementById("inputbox");
         let textinput = a.value;
         let output = detectQueryLang(textinput);
-        
         document.getElementById("lang").value = output;
         let toLanguage = document.getElementById("langout").value;
         let jsonfile = '';
         if (output == 'XQuery'){
             textinput = xqueryToXml(textinput);
-            jsonfile = convertXmlToJson(textinput);
+            jsonfile = xmlToJson(textinput);
         }
         else if (output == 'SQL')
         {
@@ -163,9 +163,6 @@
         {
             jsonfile = mongoToJson(textinput);
         }
-        else{
-            jsonfile = pgsqlToJSON(textinput);
-        }
         let outputAns = '';
         console.log(jsonfile)
         if (toLanguage == 'SQL')
@@ -173,7 +170,7 @@
             outputAns = jsonToSql(jsonfile);
         }
         else if (toLanguage == 'XQuery'){
-            outputAns1 = convertJsonToXml(jsonfile)
+            outputAns1 = jsonToXml(jsonfile)
             outputAns = xmlToXQuery(outputAns1)
         }
         else if (toLanguage == 'MongoDB')
@@ -181,7 +178,7 @@
             outputAns = jsonToMongo(jsonfile);
         }
         else{
-            outputAns = createMongoToPGConverter(jsonfile);
+            outputAns = jsonToXml(jsonfile);
         }
         console.log(outputAns)
         document.getElementById("outputbox").value = outputAns;

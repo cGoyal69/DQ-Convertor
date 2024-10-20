@@ -1,4 +1,4 @@
-const mainFunction = (input) => {
+const jsonToMongo = (input) => {
     if (typeof input === 'string') {
         try {
             input = JSON.parse(input);
@@ -315,6 +315,6 @@ const examples = [
     }
 ];
 
-console.log(mainFunction(examples));
+console.log(jsonToMongo(examples));
 
-module.exports = { mainFunction };
+//module.exports = { jsonToMongo };

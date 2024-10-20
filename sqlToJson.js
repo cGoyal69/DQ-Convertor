@@ -340,7 +340,7 @@ const hasSubquery = (query) => {
 };
 
 // Main conversion function
-const convert = (sqlQuery) => {
+const sqlToJson = (sqlQuery) => {
     try {
         sqlQuery = sqlQuery.trim();
         const queryType = sqlQuery.split(/\s+/)[0].toUpperCase();
@@ -365,7 +365,7 @@ const convert = (sqlQuery) => {
 
 // Example usage
 const queries = [
-    `INSERT INTO orders (order_id, customer_name, product_id, product_name, order_date, status) VALUES (1, 'Chirag', 123, 'Laptop', 8, 'Shipped'), (2, 'Kavyaa', 456, 'Smartphone', 1, 'Delivered'), (3, 'Lakshita', 789, 'Headphones', 2, 'Processing');`,
+    `UPDATE users SET age = 31 , a = b WHERE name = 'John Doe' AND name IN ('Kavyaa', 'Lakshita', 'Cousin')`,
     `UPDATE users SET age = 31 , a = b WHERE name = 'John Doe' AND order_id IN (SELECT order_id FROM order_items WHERE product_id = 123 AND name IN ('Kavyaa', 'Lakshita', 'Cousin'))`,
     "SELECT product_name, AVG(quantity) as total_quantity FROM order_items GROUP BY product_name ORDER BY total_quantity DESC LIMIT 10 OFFSET 5",
     `SELECT first_name, last_name, salary FROM employees WHERE department = 'HR' and name in (SELECT name from heros)`,
@@ -382,11 +382,11 @@ const queries = [
 ];
 
 queries.forEach(query => {
-    const result = convert(query);
+    const result = sqlToJson(query);
     console.log("SQL Query:", query);
     console.log("MongoDB-style JSON:", JSON.stringify(result, null, 2));
     console.log();
 });
 
 // Export the main conversion function
-module.exports = convert;
+// module.exports = sqlToJson;

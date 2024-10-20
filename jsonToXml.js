@@ -1,10 +1,15 @@
-// convertJsonToXml.js
-const { DOMParser, XMLSerializer } = require('xmldom');
+//const { DOMParser, XMLSerializer } = require('xmldom');
 
-function convertJsonToXml(originalJson) {
+function jsonToXml(oJson) {
     function jsonToXml(obj, parentElement) {
         for (const prop in obj) {
-            const tagName = prop.replace(/^\$/, '_dollar_');
+            let tagName = prop;
+
+            // Ensure valid XML tag names (replace invalid characters and add a prefix for names that are not valid)
+            if (!/^[a-zA-Z_][\w\.\-]*$/.test(tagName)) {
+                tagName = `_invalid_${tagName.replace(/[^a-zA-Z0-9_\-\.]/g, '_')}`;
+            }
+
             const element = parentElement.appendChild(parentElement.ownerDocument.createElement(tagName));
 
             if (typeof obj[prop] === 'object' && !Array.isArray(obj[prop])) {
@@ -21,7 +26,8 @@ function convertJsonToXml(originalJson) {
             }
         }
     }
-
+    
+    const originalJson = JSON.stringify(oJson);
     const jsonObject = JSON.parse(originalJson);
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString('<root></root>', "text/xml");
@@ -29,9 +35,36 @@ function convertJsonToXml(originalJson) {
     return new XMLSerializer().serializeToString(xmlDoc);
 }
 
+const a =  {
+    "operation": "updateMany",
+    "collection": "users",
+    "update": {
+      "$set": {
+        "age": 31,
+        "a": "b"
+      }
+    },
+    "filter": {
+      "$and": [
+        {
+          "name": {
+            "$eq": "John Doe"
+          }
+        },
+        {
+          "name": {
+            "$in": [
+              "Kavyaa",
+              "Lakshita",
+              "'Cou"
+            ]
+          }
+        }
+      ]
+    }
+  }
 
-const a =  `{"collection":"users","operation":"find","filter":{"user":{"$eq":"b"}},"projection":{"user":1}}`
-console.log(convertJsonToXml(a))
+console.log(jsonToXml(a));
 
 // Export the function
-module.exports = convertJsonToXml;
+//export default jsonToXml;

@@ -1,5 +1,6 @@
-const jsonToSql = (json) => {
-  json = JSON.parse(json);
+const jsonToSql = (Json) => {
+  const ogjson = JSON.stringify(Json)
+  const json = JSON.parse(ogjson);
   switch (json.operation) {
     case 'insert':
     case 'insertOne':
@@ -351,8 +352,8 @@ const exampleDropTable = `{
 console.log(jsonToSql(exampleInsert));
 console.log(jsonToSql(exampleFind));
 console.log(jsonToSql(exampleUpdate));
-console.log(jsonToSql(exampleDelete));
+// console.log(jsonToSql(exampleDelete));
 console.log(jsonToSql(exampleCreateTable));
 console.log(jsonToSql(exampleDropTable));
 
-module.exports = jsonToSql;
+//module.exports = jsonToSql;
