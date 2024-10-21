@@ -258,13 +258,7 @@ const examples = [
                 "$match": {
                     "name": {
                         "$in": [
-                            {
-                                "operation": "find",
-                                "collection": "heros",
-                                "projection": {
-                                    "name": 1
-                                }
-                            }
+                            "a","b"
                         ]
                     }
                 }
