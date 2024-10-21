@@ -1,10 +1,16 @@
-const jsonToSql = (Json) => {
-  const ogjson = JSON.stringify(Json)
-  const json = JSON.parse(ogjson);
+// let ogjson = oJson;
+//   if (typeof oJson == 'object')
+//   {
+//     ogjson = JSON.stringify(oJson)
+//   }
+//   let json = JSON.parse(ogjson);
+const jsonToSql = (oJson) => {
+  
+  let json = JSON.parse(oJson);
   switch (json.operation) {
     case 'insert':
     case 'insertOne':
-    case 'insertMany':
+    case "insertMany":
       return insertToSql(json);
     case 'find':
       return findToSql(json);

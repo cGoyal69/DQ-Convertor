@@ -36,17 +36,7 @@ const convertToMongoDBQuery = (query) => {
         mongoDBQuery += `var ${resultVar} = db.${query.collection}.find(\n`;
         mongoDBQuery += `  ${stringifyObject(query.filter || {})},\n`;
         mongoDBQuery += `  ${stringifyObject(query.projection || {})}\n`;
-        mongoDBQuery += `)`;
-        
-        if (query.sort) {
-            mongoDBQuery += `.sort(${stringifyObject(query.sort)})`;
-        }
-        
-        if (query.limit) {
-            mongoDBQuery += `.limit(${query.limit})`;
-        }
-        
-        mongoDBQuery += `.toArray();\n`;
+        mongoDBQuery += `).toArray();\n`;
         return resultVar;
     };
 
@@ -70,12 +60,18 @@ const convertToMongoDBQuery = (query) => {
             if (stage.$project) {
                 mongoDBQuery += `  { $project: ${stringifyObject(stage.$project)} },\n`;
             }
+            if (stage.$group) {
+                mongoDBQuery += `  { $group: ${stringifyObject(stage.$group)} },\n`;
+            }
             // Add other stages as needed
         });
 
         mongoDBQuery = mongoDBQuery.slice(0, -2) + '\n'; // Remove last comma
         mongoDBQuery += `]);\n`;
     };
+
+    // ... (rest of the code remains the same)
+
 
     const processUpdate = (query) => {
         const filterKeys = Object.keys(query.filter);
@@ -258,7 +254,7 @@ const examples = [
                 "$match": {
                     "name": {
                         "$in": [
-                            "a","b"
+                            "a", "b"
                         ]
                     }
                 }
@@ -276,39 +272,56 @@ const examples = [
         "operation": "deleteMany",
         "collection": "users",
         "filter": {
-            "order_id": {
+            "username": {
                 "$in": [
                     {
                         "operation": "find",
-                        "collection": "order_items",
-                        "projection": {
-                            "order_id": 1
-                        },
+                        "collection": "employees",
                         "filter": {
-                            "$and": [
-                                {
-                                    "product_id": {
-                                        "$eq": 123
-                                    }
-                                },
-                                {
-                                    "name": {
-                                        "$in": [
-                                            "Kavyaa",
-                                            "Lakshita",
-                                            "'Cou"
-                                        ]
-                                    }
-                                }
-                            ]
+                            "salary": { "$gt": 5000 }
                         }
                     }
                 ]
             }
         }
-    }
+    },
+    {
+        "operation": "aggregate",
+        "collection": "employees",
+        "pipeline": [
+          {
+            "$match": {
+              "department_id": {
+                "$in": [
+                  {
+                    "operation": "find",
+                    "collection": "departments",
+                    "projection": {
+                      "department_id": 1
+                    },
+                    "filter": {
+                      "department_name": {
+                        "$eq": "HR"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "$project": {
+              "*": 1
+            }
+          }
+        ]
+      }
 ];
 
-console.log(jsonToMongo(examples));
-
-//module.exports = { jsonToMongo };
+// Example execution
+try {
+    const result = jsonToMongo(examples);
+    console.log(result);
+} catch (error) {
+    console.error(error.message);
+}

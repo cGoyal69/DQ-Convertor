@@ -170,7 +170,7 @@
             outputAns = jsonToSql(jsonfile);
         }
         else if (toLanguage == 'XQuery'){
-            outputAns1 = jsonToXml(jsonfile)
+            outputAns1 = convertJsonToXml(jsonfile)
             outputAns = xmlToXQuery(outputAns1)
         }
         else if (toLanguage == 'MongoDB')
@@ -178,7 +178,7 @@
             outputAns = jsonToMongo(jsonfile);
         }
         else{
-            outputAns = jsonToXml(jsonfile);
+            outputAns = convertJsonToXml(jsonfile);
         }
         console.log(outputAns)
         document.getElementById("outputbox").value = outputAns;

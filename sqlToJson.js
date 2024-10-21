@@ -1,4 +1,3 @@
-// Utility functions
 const parseValue = (value) => {
     value = value.trim();
     if (value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1);
@@ -9,6 +8,7 @@ const parseValue = (value) => {
 };
 
 const parseProjection = (columns) => {
+    if (columns.trim() === '*') return {};
     const projection = {};
     columns.split(',').forEach(col => {
         col = col.trim();
@@ -77,10 +77,10 @@ const parseCondition = (condition) => {
     const nestedMatch = condition.match(nestedQueryRegex);
     if (nestedMatch) {
         const [, field, nestedQuery] = nestedMatch;
-        const convertedNestedQuery = convert(nestedQuery);
+        const convertedNestedQuery = sqlToJson(nestedQuery);
         return {
             [field]: {
-                $in: Array.isArray(convertedNestedQuery) ? convertedNestedQuery : [convertedNestedQuery]
+                $in: convertedNestedQuery.operation === "find" ? [convertedNestedQuery] : convertedNestedQuery
             }
         };
     }
@@ -104,15 +104,19 @@ const parseCondition = (condition) => {
         if (condition.toUpperCase().includes(sqlOp)) {
             let [left, right] = condition.split(new RegExp(`\\s*${sqlOp}\\s*`, 'i'));
             left = left.trim();
-            right = parseValue(right?.trim());
+            right = right ? parseValue(right.trim()) : null;
 
-            if (sqlOp === 'LIKE') {
-                right = new RegExp(right.replace(/%/g, '.*'));
-            } else if (sqlOp === 'NOT LIKE') {
-                right = new RegExp(right.replace(/%/g, '.*'));
-                return { [left]: { $not: { $regex: right } } };
+            if (sqlOp === 'LIKE' || sqlOp === 'NOT LIKE') {
+                right = new RegExp('^' + right.replace(/%/g, '.*') + '$');
+                return sqlOp === 'LIKE' 
+                    ? { [left]: { $regex: right } }
+                    : { [left]: { $not: { $regex: right } } };
             } else if (sqlOp === 'IN' || sqlOp === 'NOT IN') {
                 right = right.slice(1, -1).split(',').map(item => parseValue(item.trim()));
+            } else if (sqlOp === 'IS NULL') {
+                return { [left]: { $eq: null } };
+            } else if (sqlOp === 'IS NOT NULL') {
+                return { [left]: { $ne: null } };
             }
 
             return { [left]: { [mongoOp]: right } };
@@ -168,9 +172,9 @@ const handleComplexSelect = (columns, from, where, groupBy, having, orderBy, lim
             col = col.trim();
             if (col.toLowerCase().includes(' as ')) {
                 const [expr, alias] = col.split(/\s+as\s+/i);
-                groupStage.$group[alias.trim()] = parseAggregateExpression(expr);
+                groupStage.$group[alias.trim()] = parseAggregateExpression(expr.trim());
             } else if (!groupBy.includes(col)) {
-                groupStage.$group[col] = { $first: `$${col}` };
+                groupStage.$group[col] = parseAggregateExpression(col);
             }
         });
 
@@ -199,6 +203,8 @@ const handleComplexSelect = (columns, from, where, groupBy, having, orderBy, lim
         if (col.toLowerCase().includes(' as ')) {
             const [, alias] = col.split(/\s+as\s+/i);
             projectStage.$project[alias.trim()] = 1;
+        } else if (groupBy) {
+            projectStage.$project[col] = `$${col}`;
         } else {
             projectStage.$project[col] = 1;
         }
@@ -227,7 +233,7 @@ const handleInsert = (query) => {
     return {
         operation: documents.length > 1 ? "insertMany" : "insertOne",
         collection: table.trim(),
-        documents: documents.length > 1 ? documents : documents[0],
+        documents: documents
     };
 };
 
@@ -241,21 +247,16 @@ const handleUpdate = (query) => {
 
     const [, table, set, where] = match;
 
-    const updateOps = parseSetClause(set);
-    const numberOfUpdates = Object.keys(updateOps).length;
-
-    const operationType = (numberOfUpdates === 1) ? 'updateOne' : 'updateMany';
-
     return {
-        operation: operationType,
+        operation: "updateMany",
         collection: table.trim(),
-        update: { $set: updateOps },
+        update: { $set: parseSetClause(set) },
         filter: parseCondition(where)
     };
 };
 
 const handleDelete = (query) => {
-    const regex = /DELETE\s+FROM\s+(.*?)(?:\s+WHERE\s+(.*))?/is;
+    const regex = /DELETE\s+FROM\s+(\w+)(?:\s+WHERE\s+(.*))?/is; // Capture the table name correctly
     const match = query.match(regex);
 
     if (!match) {
@@ -266,16 +267,16 @@ const handleDelete = (query) => {
 
     const result = {
         operation: "deleteMany",
-        collection: table.trim(),
+        collection: table.trim(), // Ensure the table name is trimmed
     };
 
-    if (where) result.filter = parseCondition(where);
+    if (where) result.filter = parseCondition(where.trim()); // Trim the condition as well
 
     return result;
 };
 
+
 const handleCreateTable = (sqlCreateTable) => {
-    // Extract table name
     const tableNameMatch = sqlCreateTable.match(/CREATE TABLE (\w+)/i);
     const tableName = tableNameMatch ? tableNameMatch[1] : null;
 
@@ -334,6 +335,68 @@ const handleCreateTable = (sqlCreateTable) => {
 
     return intermediateJson;
 };
+/*
+function sqlToIntermediateJson(sqlCommand) {
+    // Extract table name
+    const tableNameMatch = sqlCommand.match(/CREATE TABLE (\w+)/i);
+    const tableName = tableNameMatch ? tableNameMatch[1] : null;
+
+    if (!tableName) {
+        throw new Error("Invalid SQL: Unable to extract table name");
+    }
+
+    // Extract column definitions
+    const columnRegex = /(\w+)\s+(\w+(?:\(\d+\))?)\s*([^,\n]+)?/g;
+    const columns = [...sqlCommand.matchAll(columnRegex)];
+
+    const intermediateJson = {
+        operation: "createTable",
+        tableName: tableName,
+        columns: []
+    };
+
+    let hasPrimaryKey = false;
+
+    columns.forEach(column => {
+        const [, name, dataType, constraintsStr] = column;
+        const columnDef = {
+            name: name,
+            type: dataType.toUpperCase(),
+            constraints: []
+        };
+
+        if (constraintsStr) {
+            if (/NOT NULL/i.test(constraintsStr)) {
+                columnDef.constraints.push("NOT NULL");
+            }
+            if (/UNIQUE/i.test(constraintsStr)) {
+                columnDef.constraints.push("UNIQUE");
+            }
+            if (/PRIMARY KEY/i.test(constraintsStr)) {
+                if (hasPrimaryKey) {
+                    throw new Error("Multiple primary keys are not supported");
+                }
+                hasPrimaryKey = true;
+                columnDef.constraints.push("PRIMARY KEY");
+            }
+            // Add checks for other constraints here
+        }
+
+        intermediateJson.columns.push(columnDef);
+    });
+
+    // Add _id field if no primary key was specified
+    if (!hasPrimaryKey) {
+        intermediateJson.columns.unshift({
+            name: "_id",
+            type: "VARCHAR(24)",
+            constraints: ["NOT NULL", "PRIMARY KEY"]
+        });
+    }
+
+    return intermediateJson;
+}
+*/
 
 const hasSubquery = (query) => {
     return /\(SELECT\s+.*?\)/i.test(query);
@@ -365,7 +428,8 @@ const sqlToJson = (sqlQuery) => {
 
 // Example usage
 const queries = [
-    `UPDATE users SET age = 31 , a = b WHERE name = 'John Doe' AND name IN ('Kavyaa', 'Lakshita', 'Cousin')`,
+    `SELECT * FROM employees
+WHERE department_id in (SELECT department_id FROM departments WHERE department_name = 'HR')`,
     `UPDATE users SET age = 31 , a = b WHERE name = 'John Doe' AND order_id IN (SELECT order_id FROM order_items WHERE product_id = 123 AND name IN ('Kavyaa', 'Lakshita', 'Cousin'))`,
     "SELECT product_name, AVG(quantity) as total_quantity FROM order_items GROUP BY product_name ORDER BY total_quantity DESC LIMIT 10 OFFSET 5",
     `SELECT first_name, last_name, salary FROM employees WHERE department = 'HR' and name in (SELECT name from heros)`,
@@ -378,7 +442,8 @@ const queries = [
         last_login DATETIME,
         is_active BOOLEAN DEFAULT true,
         role ENUM('user', 'admin', 'moderator') DEFAULT 'user'
-    )`
+    )`,
+    `DELETE from users where a = b`
 ];
 
 queries.forEach(query => {

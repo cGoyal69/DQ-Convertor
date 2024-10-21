@@ -30,7 +30,7 @@ function mongoToJson(queryString) {
       break;
     case 'insertOne':
     case 'insertMany':
-      result.documents = argsArray[0];
+      result.documents = Array.isArray(argsArray[0]) ? argsArray[0] : [argsArray[0]];
       break;
     case 'updateOne':
     case 'updateMany':
@@ -226,33 +226,13 @@ function parseArguments(argsString) {
 
 //module.exports = mongoToJson;
 
+// Test cases
 console.log(mongoToJson(`db.users.updateMany({ order_id: { $in: [ { operation: "find", collection: "order_items", projection: { order_id: 1 }, filter: { $and: [ { product_id: { $eq: 123 } }, { name: { $in: [ "Kavyaa", "Lakshita", "'Cou" ] } } ] } } ] } }, { $set: { age: 31, a: "b" } })`));
-console.log(mongoToJson(`db.createCollection("employees", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["_id", "name", "age", "department_id"],
-      properties: {
-        _id: {
-          bsonType: "objectId",
-          description: "must be an ObjectId and is the primary key"
-        },
-        name: {
-          bsonType: "string",
-          description: "must be a string and is required"
-        },
-        age: {
-          bsonType: "int",
-          minimum: 18,
-          description: "must be an integer and is required, age must be >= 18"
-        },
-        department_id: {
-          bsonType: "objectId",
-          description: "must be an ObjectId and reference the _id from the departments collection"
-        }
-      }
-    }
-  }
+console.log(mongoToJson(`db.employees.insertOne({
+  first_name: 'John',
+  last_name: 'Doe',
+  age: 28,
+  department: 'Marketing'
 })`));
 console.log(mongoToJson(`
 db.createCollection("users", {
